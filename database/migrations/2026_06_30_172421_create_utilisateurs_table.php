@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('fonction', 100)->nullable();
             $table->boolean('actif')->default(true)->comment('Compte actif des sa creation par l administrateur');
             $table->boolean('premiere_connexion')->default(true)->comment('Force le changement du mot de passe par defaut');
+            $table->rememberToken();
             $table->softDeletes();
             $table->timestamps();
 

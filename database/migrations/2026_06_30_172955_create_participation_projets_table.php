@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -26,7 +27,7 @@ return new class extends Migration
                 'membre_equipe',
                 'partenaire',
             ])->comment('Role contextuel, propre a ce projet, attribue par le chef de projet');
-            $table->date('date_affectation')->useCurrent();
+            $table->date('date_affectation')->default(DB::raw('CURRENT_DATE'));
             $table->enum('statut', ['actif', 'suspendu', 'sorti'])->default('actif');
             $table->timestamps();
 

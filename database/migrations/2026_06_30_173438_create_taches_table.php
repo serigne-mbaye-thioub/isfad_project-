@@ -30,10 +30,11 @@ return new class extends Migration
                 ->comment('Responsable RACI unique de la tache');
 
             $table->foreignId('id_approbateur')
+                ->nullable()
                 ->constrained('utilisateurs')
-                ->restrictOnDelete()
+                ->nullOnDelete()
                 ->cascadeOnUpdate()
-                ->comment('Approbateur RACI unique de la tache');
+                ->comment('Approbateur RACI unique de la tache, optionnel');
 
             $table->softDeletes()->comment('Archivage logique de la tache');
             $table->timestamps();
