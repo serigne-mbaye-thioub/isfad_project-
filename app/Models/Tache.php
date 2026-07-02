@@ -22,6 +22,7 @@ class Tache extends Model
     protected $table = 'taches';
 
     protected $fillable = [
+        'id_projet',
         'id_activite',
         'titre',
         'description',
@@ -47,7 +48,13 @@ class Tache extends Model
 
     // ─── Relations ────────────────────────────────────────────────────────────
 
-    /** Activité à laquelle appartient cette tâche */
+    /** Projet auquel appartient directement cette tâche (optionnel si liée à une activité) */
+    public function projet(): BelongsTo
+    {
+        return $this->belongsTo(Projet::class, 'id_projet');
+    }
+
+    /** Activité à laquelle appartient cette tâche (optionnel si liée directement à un projet) */
     public function activite(): BelongsTo
     {
         return $this->belongsTo(Activite::class, 'id_activite');

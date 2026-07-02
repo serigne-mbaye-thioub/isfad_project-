@@ -22,7 +22,7 @@ return new class extends Migration
             $table->dateTime('date_reunion');
             $table->unsignedInteger('duree_minutes')->nullable();
             $table->text('compte_rendu')->nullable();
-            $table->enum('statut', ['planifiee', 'en_cours', 'terminee', 'annulee'])->default('planifiee');
+            $table->enum('statut', ['en_attente', 'planifiee', 'en_cours', 'terminee', 'annulee'])->default('en_attente');
             $table->foreignId('id_organisateur')
                 ->constrained('utilisateurs')
                 ->restrictOnDelete()

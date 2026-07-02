@@ -29,6 +29,7 @@ class Projet extends Model
         'date_fin',
         'priorite',
         'statut',
+        'etat_spse',
         'avancement',
         'id_createur',
     ];
@@ -84,6 +85,12 @@ class Projet extends Model
     public function jalons(): HasMany
     {
         return $this->hasMany(Jalon::class, 'id_projet');
+    }
+
+    /** Tâches liées directement au projet (sans passer par une activité) */
+    public function taches(): HasMany
+    {
+        return $this->hasMany(Tache::class, 'id_projet');
     }
 
     /** Réunions liées à ce projet */

@@ -93,11 +93,14 @@ class AuthController extends Controller
         $utilisateur = Utilisateur::where('email', $request->email)->first();
 
         // ── Vérification en temps constant pour éviter les timing attacks ─────
-        // On vérifie toujours le mot de passe même si l'utilisateur n'existe pas
-        $motDePasseValide = $utilisateur && Hash::check(
-            $request->mot_de_passe,
-            $utilisateur->mot_de_passe
-        );
+        // Si l'utilisateur n'existe pas, on hash une chaîne factice pour prendre le même temps
+        // que s'il existait, empêchant ainsi l'énumération des emails via l'analyse du temps de réponse.
+        if (! $utilisateur) {
+            Hash::check($request->mot_de_passe, '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi');
+            $motDePasseValide = false;
+        } else {
+            $motDePasseValide = Hash::check($request->mot_de_passe, $utilisateur->mot_de_passe);
+        }
 
         // Réponse générique identique dans tous les cas d'échec
         if (! $utilisateur || ! $motDePasseValide || ! $utilisateur->actif) {

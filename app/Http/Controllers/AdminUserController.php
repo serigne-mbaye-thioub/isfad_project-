@@ -20,7 +20,7 @@ class AdminUserController extends Controller
     {
         // 1. Autorisation : vérification stricte du rôle Administrateur
         $currentUser = $request->user();
-        if (!$currentUser || !Str::contains(strtolower($currentUser->fonction), 'administrateur')) {
+        if (!$currentUser || !in_array($currentUser->fonction, ['Administrateur', 'Administrateur système'])) {
             return response()->json([
                 'message' => 'Accès non autorisé. Seul un administrateur peut effectuer cette action.',
             ], 403);

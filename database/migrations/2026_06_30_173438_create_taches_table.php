@@ -10,7 +10,14 @@ return new class extends Migration
     {
         Schema::create('taches', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('id_projet')
+                ->nullable()
+                ->constrained('projets')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+
             $table->foreignId('id_activite')
+                ->nullable()
                 ->constrained('activites')
                 ->cascadeOnDelete()
                 ->cascadeOnUpdate();

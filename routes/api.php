@@ -69,4 +69,34 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
      * Body: nom, prenom, email, telephone?, fonction
      */
     Route::post('/admin/users', [AdminUserController::class, 'store']);
+
+    // ── Routes Projets ─────────────────────────────────────────────────────────
+    Route::get('/projets', [\App\Http\Controllers\ProjetController::class, 'index']);
+    Route::post('/projets', [\App\Http\Controllers\ProjetController::class, 'store']);
+    Route::get('/projets/{id}', [\App\Http\Controllers\ProjetController::class, 'show']);
+    Route::post('/projets/{id}/membres', [\App\Http\Controllers\ProjetController::class, 'addMembre']);
+    Route::put('/projets/{id}', [\App\Http\Controllers\ProjetController::class, 'update']);
+    Route::patch('/projets/{id}/etat-spse', [\App\Http\Controllers\ProjetController::class, 'updateEtatSpse']);
+
+    // ── Routes Phases ──────────────────────────────────────────────────────────
+    Route::post('/projets/{id}/phases', [\App\Http\Controllers\PhaseController::class, 'store']);
+    Route::put('/phases/{id}', [\App\Http\Controllers\PhaseController::class, 'update']);
+    Route::patch('/phases/{id}/statut', [\App\Http\Controllers\PhaseController::class, 'updateStatut']);
+
+    // ── Routes Activités ───────────────────────────────────────────────────────
+    Route::post('/phases/{id}/activites', [\App\Http\Controllers\ActiviteController::class, 'store']);
+    Route::put('/activites/{id}', [\App\Http\Controllers\ActiviteController::class, 'update']);
+    Route::delete('/activites/{id}', [\App\Http\Controllers\ActiviteController::class, 'destroy']);
+
+    // ── Routes Tâches et RACI ──────────────────────────────────────────────────
+    Route::post('/taches', [\App\Http\Controllers\TacheController::class, 'store']);
+    Route::put('/taches/{id}', [\App\Http\Controllers\TacheController::class, 'update']);
+    Route::patch('/taches/{id}/statut', [\App\Http\Controllers\TacheController::class, 'updateStatut']);
+    Route::post('/taches/{id}/raci', [\App\Http\Controllers\TacheController::class, 'assignRaci']);
+
+    // ── Routes Réunions et Demandes ───────────────────────────────────────────
+    Route::get('/reunions/mes-reunions', [\App\Http\Controllers\ReunionController::class, 'index']);
+    Route::get('/reunions/demandes', [\App\Http\Controllers\ReunionController::class, 'demandes']);
+    Route::post('/reunions', [\App\Http\Controllers\ReunionController::class, 'store']);
+    Route::patch('/reunions/{id}/valider', [\App\Http\Controllers\ReunionController::class, 'valider']);
 });

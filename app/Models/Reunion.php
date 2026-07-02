@@ -58,6 +58,17 @@ class Reunion extends Model
         return $this->belongsTo(Utilisateur::class, 'id_organisateur');
     }
 
+    /** Les participants invités à cette réunion */
+    public function participants()
+    {
+        return $this->belongsToMany(
+            Utilisateur::class,
+            'participation_reunions',
+            'id_reunion',
+            'id_utilisateur'
+        )->withPivot('statut_presence')->withTimestamps();
+    }
+
     // ─── Accesseurs ───────────────────────────────────────────────────────────
 
     /** Heure de fin estimée de la réunion */
