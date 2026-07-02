@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -61,4 +62,11 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
      * Body: mot_de_passe_actuel, nouveau_mot_de_passe, nouveau_mot_de_passe_confirmation
      */
     Route::post('/change-password', [AuthController::class, 'changePassword']);
+
+    /**
+     * POST /api/admin/users
+     * Création de compte utilisateur par l'administrateur.
+     * Body: nom, prenom, email, telephone?, fonction
+     */
+    Route::post('/admin/users', [AdminUserController::class, 'store']);
 });

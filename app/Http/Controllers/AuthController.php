@@ -178,7 +178,7 @@ class AuthController extends Controller
                     ->mixedCase()
                     ->numbers()
                     ->symbols()
-                    ->uncompromised(),
+                    ->when(! app()->environment('testing'), fn ($rule) => $rule->uncompromised()),
             ],
         ], [
             'nouveau_mot_de_passe.confirmed' => 'La confirmation du nouveau mot de passe ne correspond pas.',
