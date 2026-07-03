@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, FolderKanban, Calendar, Bell, LogOut, ChevronDown, Wallet, GitPullRequest } from 'lucide-react';
+import { LayoutDashboard, Users, FolderKanban, Calendar, Bell, LogOut, ChevronDown, Shield, FileText } from 'lucide-react';
 import api from '../axios';
 
 const DashboardLayout = () => {
@@ -89,6 +89,35 @@ const DashboardLayout = () => {
                             <span>{item.label}</span>
                         </NavLink>
                     ))}
+
+                    {/* Section Administration (Restreinte) */}
+                    {['Administrateur', 'Administrateur système'].includes(user.fonction) && (
+                        <div className="pt-6">
+                            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest px-3 mb-3">Administration</p>
+                            <NavLink
+                                to="/admin/utilisateurs"
+                                className={({ isActive }) =>
+                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                                        isActive ? 'bg-[#0564A8] text-white shadow-md' : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                                    }`
+                                }
+                            >
+                                <Users size={17} />
+                                <span>Utilisateurs</span>
+                            </NavLink>
+                            <NavLink
+                                to="/admin/audits"
+                                className={({ isActive }) =>
+                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                                        isActive ? 'bg-[#0564A8] text-white shadow-md' : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                                    }`
+                                }
+                            >
+                                <FileText size={17} />
+                                <span>Journal d'Audit</span>
+                            </NavLink>
+                        </div>
+                    )}
 
 
                 </nav>

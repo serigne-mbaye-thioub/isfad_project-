@@ -7,6 +7,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ListeProjets from './pages/Projets/ListeProjets';
 import ProjetDetail from './pages/Projets/ProjetDetail';
 import Reunions from './pages/Reunions';
+import UtilisateursAdmin from './pages/Admin/UtilisateursAdmin';
+import JournalAudit from './pages/Admin/JournalAudit';
 
 // Bug fix #3 : plus de chevauchement de routes sur '/'.
 // Bug fix #8 : ProtectedRoute enveloppe les pages sécurisées.
@@ -46,6 +48,14 @@ const router = createBrowserRouter([
             {
                 path: 'reunions',
                 element: <Reunions />,
+            },
+            {
+                path: 'admin/utilisateurs',
+                element: <UtilisateursAdmin />,
+            },
+            {
+                path: 'admin/audits',
+                element: <JournalAudit />,
             },
         ],
     },

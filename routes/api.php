@@ -70,12 +70,13 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     Route::post('/change-password', [AuthController::class, 'changePassword']);
 
     /**
-     * POST /api/admin/users
-     * Création de compte utilisateur par l'administrateur.
-     * Body: nom, prenom, email, telephone?, fonction
+     * Routes Administration
      */
+    Route::get('/admin/users', [AdminUserController::class, 'index']);
     Route::post('/admin/users', [AdminUserController::class, 'store']);
     Route::patch('/admin/users/{id}/statut', [AdminUserController::class, 'updateStatut']);
+    
+    Route::get('/admin/audits', [\App\Http\Controllers\AuditController::class, 'index']);
 
     // ── Routes Utilisateurs ────────────────────────────────────────────────────
     Route::get('/utilisateurs', [\App\Http\Controllers\UtilisateurController::class, 'index']);

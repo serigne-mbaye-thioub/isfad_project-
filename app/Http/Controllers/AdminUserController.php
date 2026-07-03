@@ -13,6 +13,20 @@ use Illuminate\Validation\Rule;
 class AdminUserController extends Controller
 {
     /**
+     * GET /api/admin/users
+     * Liste complète des utilisateurs avec pagination ou en brut.
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $currentUser = $request->user();
+        if (!$currentUser || !in_array($currentUser->fonction, ['Administrateur', 'Administrateur système'])) {
+            return response()->json(['message' => 'Accès non autorisé.'], 403);
+        }
+
+        $utilisateurs = Utilisateur::orderBy('created_at', 'desc')->get();
+        return response()->json($utilisateurs);
+    }
+    /**
      * POST /api/admin/users
      * Permet à l'Administrateur de créer un compte utilisateur.
      */
