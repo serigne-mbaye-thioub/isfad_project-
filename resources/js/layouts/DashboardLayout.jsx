@@ -42,7 +42,6 @@ const DashboardLayout = () => {
     const navItems = [
         { to: '/dashboard', icon: <LayoutDashboard size={17} />, label: 'Tableau de bord' },
         { to: '/projets', icon: <FolderKanban size={17} />, label: 'Projets' },
-        { to: '/equipes', icon: <Users size={17} />, label: 'Équipes' },
         { to: '/reunions', icon: <Calendar size={17} />, label: 'Réunions' },
     ];
 

@@ -8,7 +8,7 @@ const BudgetProjet = ({ projetId, currentUser }) => {
     const [showInitModal, setShowInitModal] = useState(false);
     const [showDepenseModal, setShowDepenseModal] = useState(false);
 
-    const [formInit, setFormInit] = useState({ montant_alloue: '', devise: 'XOF' });
+    const [formInit, setFormInit] = useState({ montant_initial: '', devise: 'XOF' });
     const [formDepense, setFormDepense] = useState({ description: '', montant: '', date_depense: '', categorie: '' });
 
     const fetchBudget = async () => {
@@ -85,7 +85,7 @@ const BudgetProjet = ({ projetId, currentUser }) => {
                             <div className="space-y-4 mb-6">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1 uppercase">Montant (XOF)</label>
-                                    <input type="number" required min="1" className="w-full border rounded-lg p-2 text-sm" value={formInit.montant_alloue} onChange={e => setFormInit({...formInit, montant_alloue: e.target.value})} />
+                                    <input type="number" required min="1" className="w-full border rounded-lg p-2 text-sm" value={formInit.montant_initial} onChange={e => setFormInit({...formInit, montant_initial: e.target.value})} />
                                 </div>
                             </div>
                             <div className="flex justify-end gap-2">

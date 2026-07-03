@@ -49,7 +49,7 @@ class AdminDashboardController extends Controller
 
         // KPI 6 : Indicateur de Budget Global
         // (Si la table existe et a des données)
-        $budget_alloue = Budget::sum('montant_alloue') ?? 0;
+        $budget_alloue = Budget::sum('montant_initial') ?? 0;
         $budget_consomme = Depense::where('statut', 'approuvee')->sum('montant') ?? 0;
 
         // KPI 7 : Activité récente (10 dernières actions du système)

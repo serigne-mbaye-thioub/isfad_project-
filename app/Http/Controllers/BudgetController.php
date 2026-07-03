@@ -33,16 +33,16 @@ class BudgetController extends Controller
         // Calculs des totaux
         $total_depense = $budget->depenses->where('statut', 'approuvee')->sum('montant');
         $en_attente = $budget->depenses->where('statut', 'en_attente')->sum('montant');
-        $reste = $budget->montant_alloue - $total_depense;
+        $reste = $budget->montant_initial - $total_depense;
 
         return response()->json([
             'budget' => $budget,
             'statistiques' => [
-                'total_alloue' => $budget->montant_alloue,
+                'total_alloue' => $budget->montant_initial,
                 'total_consomme' => $total_depense,
                 'total_en_attente' => $en_attente,
                 'reste_a_depenser' => $reste,
-                'pourcentage_consomme' => $budget->montant_alloue > 0 ? round(($total_depense / $budget->montant_alloue) * 100, 2) : 0,
+                'pourcentage_consomme' => $budget->montant_initial > 0 ? round(($total_depense / $budget->montant_initial) * 100, 2) : 0,
             ]
         ]);
     }
@@ -53,7 +53,7 @@ class BudgetController extends Controller
     public function storeOrUpdate(Request $request, int $idProjet): JsonResponse
     {
         $validated = $request->validate([
-            'montant_alloue' => 'required|numeric|min:0',
+            'montant_initial' => 'required|numeric|min:0',
             'devise'         => 'nullable|string|max:10',
             'annee_fiscale'  => 'nullable|string|max:9',
         ]);
@@ -63,7 +63,7 @@ class BudgetController extends Controller
         $budget = Budget::updateOrCreate(
             ['id_projet' => $idProjet],
             [
-                'montant_alloue' => $validated['montant_alloue'],
+                'montant_initial' => $validated['montant_initial'],
                 'devise'         => $validated['devise'] ?? 'XOF',
                 'annee_fiscale'  => $validated['annee_fiscale'] ?? date('Y'),
             ]

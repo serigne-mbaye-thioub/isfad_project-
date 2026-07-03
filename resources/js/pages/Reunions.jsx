@@ -106,7 +106,7 @@ const Reunions = () => {
     const [activeTab, setActiveTab] = useState('mes_reunions');
 
     const currentUser = JSON.parse(localStorage.getItem('auth_user') || '{}');
-    const isAdminOrChef = ['Administrateur', 'Administrateur système', 'Chef de projet', 'Gestionnaire_projet', 'Superviseur'].includes(currentUser?.fonction);
+    const isAdminOrChef = ['Administrateur', 'Administrateur système', 'Chef de projet', 'Gestionnaire de projet', 'Superviseur'].includes(currentUser?.fonction);
 
     const fetchData = async () => {
         try {
