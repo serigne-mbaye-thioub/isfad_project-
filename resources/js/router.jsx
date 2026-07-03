@@ -6,6 +6,7 @@ import DashboardLayout from './layouts/DashboardLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import ListeProjets from './pages/Projets/ListeProjets';
 import ProjetDetail from './pages/Projets/ProjetDetail';
+import Reunions from './pages/Reunions';
 
 // Bug fix #3 : plus de chevauchement de routes sur '/'.
 // Bug fix #8 : ProtectedRoute enveloppe les pages sécurisées.
@@ -41,6 +42,10 @@ const router = createBrowserRouter([
             {
                 path: 'projets/:id',
                 element: <ProjetDetail />,
+            },
+            {
+                path: 'reunions',
+                element: <Reunions />,
             },
         ],
     },

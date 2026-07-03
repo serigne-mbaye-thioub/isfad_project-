@@ -91,21 +91,7 @@ const DashboardLayout = () => {
                         </NavLink>
                     ))}
 
-                    {/* Séparateur "À venir" */}
-                    <div className="pt-4">
-                        <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest px-3 mb-3">Bientôt disponible</p>
-                        {comingSoon.map((item, i) => (
-                            <div
-                                key={i}
-                                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 cursor-not-allowed select-none"
-                                title="Module en cours de développement"
-                            >
-                                {item.icon}
-                                <span>{item.label}</span>
-                                <span className="ml-auto text-[9px] bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded font-bold tracking-wider">BIENTÔT</span>
-                            </div>
-                        ))}
-                    </div>
+
                 </nav>
 
                 {/* Profil en bas */}

@@ -110,6 +110,17 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     Route::put('/activites/{id}', [\App\Http\Controllers\ActiviteController::class, 'update']);
     Route::delete('/activites/{id}', [\App\Http\Controllers\ActiviteController::class, 'destroy']);
 
+    // ── Routes Budget & Dépenses ───────────────────────────────────────────────
+    Route::get('/projets/{id}/budget', [\App\Http\Controllers\BudgetController::class, 'show']);
+    Route::post('/projets/{id}/budget', [\App\Http\Controllers\BudgetController::class, 'storeOrUpdate']);
+    Route::post('/budgets/{id}/depenses', [\App\Http\Controllers\DepenseController::class, 'store']);
+    Route::patch('/depenses/{id}/valider', [\App\Http\Controllers\DepenseController::class, 'valider']);
+
+    // ── Routes Demandes de Changement ──────────────────────────────────────────
+    Route::get('/projets/{id}/demandes-changement', [\App\Http\Controllers\DemandeChangementController::class, 'index']);
+    Route::post('/projets/{id}/demandes-changement', [\App\Http\Controllers\DemandeChangementController::class, 'store']);
+    Route::patch('/demandes-changement/{id}/statut', [\App\Http\Controllers\DemandeChangementController::class, 'updateStatut']);
+
     // ── Routes Tâches et RACI ──────────────────────────────────────────────────
     Route::post('/taches', [\App\Http\Controllers\TacheController::class, 'store']);
     Route::put('/taches/{id}', [\App\Http\Controllers\TacheController::class, 'update']);

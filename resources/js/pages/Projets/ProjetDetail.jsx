@@ -3,11 +3,13 @@ import { useParams, Link } from 'react-router-dom';
 import api from '../../axios';
 import { 
     FolderKanban, Users, Calendar, ArrowLeft, 
-    MoreVertical, CheckCircle2, ChevronDown, Plus, LayoutDashboard
+    MoreVertical, CheckCircle2, ChevronDown, Plus, LayoutDashboard, Wallet, GitPullRequest
 } from 'lucide-react';
 import GestionEquipe from '../../components/GestionEquipe';
 import KanbanBoard from '../../components/KanbanBoard';
 import { ModalCreateActivite, ModalCreateTache } from '../../components/FormsPlanification';
+import BudgetProjet from './BudgetProjet';
+import DemandesChangement from './DemandesChangement';
 
 const ModalCreatePhase = ({ projetId, onClose, onSuccess }) => {
     const [formData, setFormData] = useState({ nom: '', description: '', date_debut: '', date_fin: '', ordre: 1 });
@@ -119,18 +121,30 @@ const ProjetDetail = () => {
             </div>
 
             {/* Navigation des onglets */}
-            <div className="flex gap-6 border-b border-gray-200 mb-6 flex-shrink-0 px-2">
+            <div className="flex gap-6 border-b border-gray-200 mb-6 flex-shrink-0 px-2 overflow-x-auto">
                 <button 
                     onClick={() => setActiveTab('kanban')}
-                    className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'kanban' ? 'border-[#0564A8] text-[#0564A8]' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
+                    className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${activeTab === 'kanban' ? 'border-[#0564A8] text-[#0564A8]' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
                 >
                     <LayoutDashboard size={16} /> Planification & Kanban
                 </button>
                 <button 
                     onClick={() => setActiveTab('equipe')}
-                    className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'equipe' ? 'border-[#0564A8] text-[#0564A8]' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
+                    className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${activeTab === 'equipe' ? 'border-[#0564A8] text-[#0564A8]' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
                 >
                     <Users size={16} /> Équipe du projet
+                </button>
+                <button 
+                    onClick={() => setActiveTab('budget')}
+                    className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${activeTab === 'budget' ? 'border-[#0564A8] text-[#0564A8]' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
+                >
+                    <Wallet size={16} /> Budget & Dépenses
+                </button>
+                <button 
+                    onClick={() => setActiveTab('demandes')}
+                    className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${activeTab === 'demandes' ? 'border-[#0564A8] text-[#0564A8]' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
+                >
+                    <GitPullRequest size={16} /> Demandes de Changement
                 </button>
             </div>
 
@@ -139,6 +153,14 @@ const ProjetDetail = () => {
                 {activeTab === 'equipe' ? (
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 overflow-y-auto">
                         <GestionEquipe projetId={projet.id} currentUserId={currentUser?.id} />
+                    </div>
+                ) : activeTab === 'budget' ? (
+                    <div className="overflow-y-auto h-full">
+                        <BudgetProjet projetId={projet.id} currentUser={currentUser} />
+                    </div>
+                ) : activeTab === 'demandes' ? (
+                    <div className="overflow-y-auto h-full">
+                        <DemandesChangement projetId={projet.id} currentUser={currentUser} />
                     </div>
                 ) : (
                     <div className="flex flex-col h-full overflow-hidden">
