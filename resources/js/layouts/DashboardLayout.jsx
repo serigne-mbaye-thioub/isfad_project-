@@ -17,8 +17,10 @@ const DashboardLayout = () => {
     // Synchroniser depuis l'API pour avoir des données fraîches
     useEffect(() => {
         api.get('/api/me').then(res => {
-            setUser(res.data);
-            localStorage.setItem('auth_user', JSON.stringify(res.data));
+            // La route /me retourne { utilisateur: {...} }
+            const u = res.data.utilisateur || res.data;
+            setUser(u);
+            localStorage.setItem('auth_user', JSON.stringify(u));
         }).catch(() => {});
     }, []);
 
