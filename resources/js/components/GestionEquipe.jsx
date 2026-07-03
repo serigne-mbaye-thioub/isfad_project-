@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import api from '../../axios';
+import api from '../axios';
 import {
     Users, UserPlus, UserMinus, Crown, ChevronDown,
     AlertTriangle, Loader2, RefreshCw, Shield, Briefcase,
