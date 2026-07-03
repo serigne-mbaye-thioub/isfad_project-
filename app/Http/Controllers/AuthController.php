@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Utilisateur;
+use App\Mail\ResetPasswordMail;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rules\Password;
 
 /**
@@ -21,58 +24,7 @@ use Illuminate\Validation\Rules\Password;
  */
 class AuthController extends Controller
 {
-    /**
-     * POST /api/register
-     * Inscription d'un nouvel utilisateur.
-     *
-     * Le compte est créé avec actif=true et premiere_connexion=true.
-     * Un jeton d'accès est immédiatement retourné.
-     */
-    public function register(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'nom'         => ['required', 'string', 'max:100'],
-            'prenom'      => ['required', 'string', 'max:100'],
-            'email'       => ['required', 'string', 'email:rfc', 'max:255', 'unique:utilisateurs,email'],
-            'telephone'   => ['nullable', 'string', 'max:20'],
-            'fonction'    => ['nullable', 'string', 'max:100'],
-            'mot_de_passe' => [
-                'required',
-                'confirmed',
-                // Règles de sécurité : min 8 chars, mixte lettres/chiffres/spéciaux
-                Password::min(8)
-                    ->letters()
-                    ->mixedCase()
-                    ->numbers()
-                    ->symbols()
-                    ->when(! app()->environment('testing'), fn ($rule) => $rule->uncompromised()),
-            ],
-        ], [
-            'email.unique'                   => 'Cette adresse email est déjà utilisée.',
-            'mot_de_passe.confirmed'         => 'La confirmation du mot de passe ne correspond pas.',
-            'mot_de_passe.min'               => 'Le mot de passe doit contenir au minimum 8 caractères.',
-        ]);
 
-        $utilisateur = Utilisateur::create([
-            'nom'                => $validated['nom'],
-            'prenom'             => $validated['prenom'],
-            'email'              => $validated['email'],
-            'telephone'          => $validated['telephone'] ?? null,
-            'fonction'           => $validated['fonction'] ?? null,
-            'mot_de_passe'       => $validated['mot_de_passe'], // Haché automatiquement par le cast 'hashed'
-            'actif'              => true,
-            'premiere_connexion' => true,
-        ]);
-
-        $token = $utilisateur->createToken('access_token')->plainTextToken;
-
-        return response()->json([
-            'message'       => 'Compte créé avec succès.',
-            'utilisateur'   => $this->formatUtilisateur($utilisateur),
-            'access_token'  => $token,
-            'token_type'    => 'Bearer',
-        ], 201);
-    }
 
     /**
      * POST /api/login
@@ -214,6 +166,73 @@ class AuthController extends Controller
             'access_token' => $token,
             'token_type'   => 'Bearer',
         ]);
+    }
+
+    /**
+     * Demande de réinitialisation de mot de passe (Envoi du code)
+     */
+    public function forgotPassword(Request $request)
+    {
+        $request->validate(['email' => 'required|email|exists:utilisateurs,email']);
+        
+        // Code à 6 chiffres
+        $token = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $request->email],
+            ['token' => $token, 'created_at' => now()]
+        );
+        
+        Mail::to($request->email)->send(new ResetPasswordMail($token));
+        
+        return response()->json(['message' => 'Un code de sécurité a été envoyé à votre adresse e-mail.']);
+    }
+
+    /**
+     * Validation du code et changement du mot de passe
+     */
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|exists:utilisateurs,email',
+            'token' => 'required|string',
+            'mot_de_passe' => 'required|string|min:8|confirmed'
+        ]);
+
+        $resetToken = DB::table('password_reset_tokens')
+            ->where('email', $request->email)
+            ->where('token', $request->token)
+            ->first();
+
+        if (!$resetToken || now()->diffInMinutes($resetToken->created_at) > 60) {
+            return response()->json(['message' => 'Le code de sécurité est invalide ou expiré.'], 400);
+        }
+
+        $user = Utilisateur::where('email', $request->email)->first();
+        $user->mot_de_passe = bcrypt($request->mot_de_passe);
+        $user->save();
+
+        DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+
+        return response()->json(['message' => 'Votre mot de passe a été réinitialisé avec succès.']);
+    }
+
+    /**
+     * Mise à jour du profil de l'utilisateur connecté
+     */
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+        
+        $validated = $request->validate([
+            'nom' => 'string|max:100',
+            'prenom' => 'string|max:100',
+            'telephone' => 'nullable|string|max:20',
+        ]);
+        
+        $user->update($validated);
+        
+        return response()->json(['message' => 'Profil mis à jour avec succès.', 'user' => $user]);
     }
 
     // ─── Helpers privés ───────────────────────────────────────────────────────

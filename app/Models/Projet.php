@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Projet extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, \App\Traits\Auditable, SoftDeletes;
 
     protected $table = 'projets';
 

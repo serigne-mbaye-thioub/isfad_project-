@@ -19,18 +19,18 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('throttle:auth')->group(function (): void {
 
     /**
-     * POST /api/register
-     * Inscription d'un nouvel utilisateur.
-     * Body: nom, prenom, email, mot_de_passe, mot_de_passe_confirmation, telephone?, fonction?
-     */
-    Route::post('/register', [AuthController::class, 'register']);
-
-    /**
      * POST /api/login
      * Authentification : retourne un jeton Bearer Sanctum.
      * Body: email, mot_de_passe
      */
     Route::post('/login', [AuthController::class, 'login']);
+
+    /**
+     * POST /api/forgot-password & /api/reset-password
+     * Récupération de mot de passe.
+     */
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 });
 
 // ── Routes protégées (authentification Sanctum requise) ───────────────────────
@@ -42,6 +42,12 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
      * Retourne les informations de l'utilisateur connecté.
      */
     Route::get('/me', [AuthController::class, 'me']);
+    
+    /**
+     * PUT /api/me
+     * Met à jour le profil (nom, prenom, telephone).
+     */
+    Route::put('/me', [AuthController::class, 'updateProfile']);
 
     /**
      * POST /api/logout
@@ -69,6 +75,12 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
      * Body: nom, prenom, email, telephone?, fonction
      */
     Route::post('/admin/users', [AdminUserController::class, 'store']);
+    Route::patch('/admin/users/{id}/statut', [AdminUserController::class, 'updateStatut']);
+
+    // ── Routes Dashboard & Configurations ──────────────────────────────────────
+    Route::get('/admin/dashboard/stats', [\App\Http\Controllers\AdminDashboardController::class, 'stats']);
+    Route::get('/admin/configurations', [\App\Http\Controllers\ConfigurationController::class, 'index']);
+    Route::put('/admin/configurations/{cle}', [\App\Http\Controllers\ConfigurationController::class, 'update']);
 
     // ── Routes Projets ─────────────────────────────────────────────────────────
     Route::get('/projets', [\App\Http\Controllers\ProjetController::class, 'index']);

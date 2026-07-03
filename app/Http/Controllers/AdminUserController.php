@@ -83,4 +83,42 @@ class AdminUserController extends Controller
             ],
         ], 201);
     }
+
+    /**
+     * PATCH /api/admin/users/{id}/statut
+     * Permet à l'Administrateur de désactiver ou réactiver un compte utilisateur.
+     */
+    public function updateStatut(Request $request, $id): JsonResponse
+    {
+        $currentUser = $request->user();
+        if (!$currentUser || !in_array($currentUser->fonction, ['Administrateur', 'Administrateur système'])) {
+            return response()->json(['message' => 'Accès non autorisé.'], 403);
+        }
+
+        $validated = $request->validate([
+            'actif' => 'required|boolean'
+        ]);
+
+        $utilisateur = Utilisateur::findOrFail($id);
+
+        if ($utilisateur->id === $currentUser->id) {
+            return response()->json(['message' => 'Vous ne pouvez pas désactiver votre propre compte.'], 400);
+        }
+
+        $utilisateur->update(['actif' => $validated['actif']]);
+
+        // Si le compte est désactivé, on pourrait aussi supprimer tous ses jetons actifs
+        if (!$validated['actif']) {
+            $utilisateur->tokens()->delete();
+        }
+
+        return response()->json([
+            'message' => 'Statut du compte mis à jour avec succès.',
+            'utilisateur' => [
+                'id' => $utilisateur->id,
+                'email' => $utilisateur->email,
+                'actif' => $utilisateur->actif,
+            ]
+        ]);
+    }
 }

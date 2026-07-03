@@ -1,0 +1,164 @@
+import React, { useEffect, useState } from 'react';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Users, FolderKanban, Calendar, Bell, LogOut, ChevronDown, Wallet, GitPullRequest } from 'lucide-react';
+import api from '../axios';
+
+const DashboardLayout = () => {
+    const navigate = useNavigate();
+    // Bug fix #6 : lire l'utilisateur depuis localStorage (mis à jour au login)
+    const [user, setUser] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('auth_user')) || { nom: '...', prenom: '', fonction: '' };
+        } catch {
+            return { nom: '...', prenom: '', fonction: '' };
+        }
+    });
+
+    // Synchroniser depuis l'API pour avoir des données fraîches
+    useEffect(() => {
+        api.get('/api/me').then(res => {
+            setUser(res.data);
+            localStorage.setItem('auth_user', JSON.stringify(res.data));
+        }).catch(() => {});
+    }, []);
+
+    const handleLogout = async () => {
+        try {
+            await api.post('/api/logout');
+        } catch (e) {
+            // On efface de toute façon
+        } finally {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_user');
+            navigate('/login');
+        }
+    };
+
+    const initials = `${user.prenom?.[0] || ''}${user.nom?.[0] || ''}`.toUpperCase() || 'U';
+
+    // Bug fix #7 : utiliser NavLink de React Router (pas href="#")
+    const navItems = [
+        { to: '/dashboard', icon: <LayoutDashboard size={17} />, label: 'Tableau de bord' },
+        { to: '/projets', icon: <FolderKanban size={17} />, label: 'Projets' },
+        { to: '/equipes', icon: <Users size={17} />, label: 'Équipes' },
+        { to: '/reunions', icon: <Calendar size={17} />, label: 'Réunions' },
+    ];
+
+    // Modules "à venir" (backend non commencé)
+    const comingSoon = [
+        { icon: <Wallet size={17} />, label: 'Budget' },
+        { icon: <GitPullRequest size={17} />, label: 'Demandes' },
+    ];
+
+    return (
+        <div className="flex h-screen overflow-hidden" style={{ fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif" }}>
+
+            {/* ── Sidebar ── */}
+            <aside className="w-60 bg-[#071525] text-white flex flex-col shadow-2xl z-30 flex-shrink-0">
+
+                {/* Logo */}
+                <div className="px-5 py-6 border-b border-white/5">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-[#0564A8] rounded-lg flex items-center justify-center font-black text-xs shadow-md">
+                            ISFAD
+                        </div>
+                        <div>
+                            <p className="text-[13px] font-extrabold text-white tracking-wide leading-tight">Gouvernance</p>
+                            <p className="text-[10px] text-blue-400 tracking-widest uppercase">UCAD · DAKAR</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Navigation principale */}
+                <nav className="flex-1 px-3 py-5 space-y-0.5 overflow-y-auto">
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest px-3 mb-3">Navigation</p>
+                    {navItems.map((item) => (
+                        <NavLink
+                            key={item.to}
+                            to={item.to}
+                            className={({ isActive }) =>
+                                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                                    isActive
+                                        ? 'bg-[#0564A8] text-white shadow-md shadow-blue-900/50'
+                                        : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                                }`
+                            }
+                        >
+                            {item.icon}
+                            <span>{item.label}</span>
+                        </NavLink>
+                    ))}
+
+                    {/* Séparateur "À venir" */}
+                    <div className="pt-4">
+                        <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest px-3 mb-3">Bientôt disponible</p>
+                        {comingSoon.map((item, i) => (
+                            <div
+                                key={i}
+                                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 cursor-not-allowed select-none"
+                                title="Module en cours de développement"
+                            >
+                                {item.icon}
+                                <span>{item.label}</span>
+                                <span className="ml-auto text-[9px] bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded font-bold tracking-wider">BIENTÔT</span>
+                            </div>
+                        ))}
+                    </div>
+                </nav>
+
+                {/* Profil en bas */}
+                <div className="px-3 py-4 border-t border-white/5">
+                    <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition group">
+                        <div className="w-8 h-8 rounded-full bg-[#00ACEF] flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+                            {initials}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-white truncate">{user.prenom} {user.nom}</p>
+                            <p className="text-[10px] text-gray-400 truncate">{user.fonction}</p>
+                        </div>
+                        <button onClick={handleLogout} title="Se déconnecter" className="text-gray-500 hover:text-red-400 transition">
+                            <LogOut size={15} />
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            {/* ── Contenu Principal ── */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+
+                {/* Topbar */}
+                <header className="h-14 bg-white border-b border-gray-100 flex items-center px-8 justify-between flex-shrink-0 shadow-sm z-20">
+                    <div className="flex items-center gap-2">
+                        {/* Fil d'Ariane dynamique — à enrichir selon la page */}
+                        <span className="text-gray-400 text-sm">ISFAD Gouvernance</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        {/* Cloche de notifications */}
+                        <button className="relative text-gray-400 hover:text-[#0564A8] transition">
+                            <Bell size={20} />
+                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#FF3834] text-white text-[9px] font-bold rounded-full flex items-center justify-center">3</span>
+                        </button>
+                        {/* Avatar */}
+                        <div className="flex items-center gap-2 cursor-pointer group">
+                            <div className="w-8 h-8 rounded-full bg-[#0564A8] flex items-center justify-center text-xs font-bold text-white">
+                                {initials}
+                            </div>
+                            <div className="hidden md:block text-right">
+                                <p className="text-xs font-bold text-gray-800 leading-tight">{user.prenom} {user.nom}</p>
+                                <p className="text-[10px] text-gray-400">{user.fonction}</p>
+                            </div>
+                            <ChevronDown size={14} className="text-gray-400 group-hover:text-gray-600 transition" />
+                        </div>
+                    </div>
+                </header>
+
+                {/* Zone de contenu */}
+                <main className="flex-1 overflow-y-auto bg-[#f0f4f8] p-8">
+                    <Outlet />
+                </main>
+            </div>
+        </div>
+    );
+};
+
+export default DashboardLayout;

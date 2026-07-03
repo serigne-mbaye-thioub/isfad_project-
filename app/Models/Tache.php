@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Tache extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, \App\Traits\Auditable, SoftDeletes;
 
     protected $table = 'taches';
 
