@@ -49,6 +49,11 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
      */
     Route::put('/me', [AuthController::class, 'updateProfile']);
 
+    // ── Routes Notifications ───────────────────────────────────────────────────
+    Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index']);
+    Route::patch('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'marquerLue']);
+    Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'marquerToutesLues']);
+
     /**
      * POST /api/logout
      * Révoque le jeton d'accès actuel (déconnexion de l'appareil courant).
