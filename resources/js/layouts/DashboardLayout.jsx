@@ -45,11 +45,7 @@ const DashboardLayout = () => {
         { to: '/reunions', icon: <Calendar size={17} />, label: 'Réunions' },
     ];
 
-    // Modules "à venir" (backend non commencé)
-    const comingSoon = [
-        { icon: <Wallet size={17} />, label: 'Budget' },
-        { icon: <GitPullRequest size={17} />, label: 'Demandes' },
-    ];
+
 
     return (
         <div className="flex h-screen overflow-hidden" style={{ fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif" }}>
