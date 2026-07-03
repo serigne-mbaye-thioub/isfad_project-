@@ -1,8 +1,9 @@
 import axios from 'axios';
 
-// Bug fix #2 : baseURL lue depuis variable d'env Vite, pas codée en dur.
+// baseURL intentionnellement vide : le proxy Vite (vite.config.js) redirige
+// /api et /sanctum vers http://localhost:8000 → même origine → pas de CORS
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+    baseURL: '',
     headers: {
         'X-Requested-With': 'XMLHttpRequest',
         'Accept': 'application/json',

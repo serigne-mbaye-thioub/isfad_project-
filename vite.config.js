@@ -13,6 +13,18 @@ export default defineConfig({
         tailwindcss(),
     ],
     server: {
+        proxy: {
+            // Toutes les requêtes /api et /sanctum sont proxifiées vers Laravel
+            // → même origine pour le navigateur → pas de CORS, cookies CSRF fonctionnels
+            '/api': {
+                target: 'http://localhost:8000',
+                changeOrigin: true,
+            },
+            '/sanctum': {
+                target: 'http://localhost:8000',
+                changeOrigin: true,
+            },
+        },
         watch: {
             ignored: ['**/storage/framework/views/**'],
         },
