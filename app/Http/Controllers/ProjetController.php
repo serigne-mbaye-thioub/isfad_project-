@@ -71,10 +71,25 @@ class ProjetController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $projet = Projet::with(['createur', 'membres', 'phases.activites.taches.racis', 'taches.racis'])->findOrFail($id);
-        
-        // TODO: Vérifier l'autorisation (seulement admin ou membre du projet)
-        
+        $projet = Projet::with([
+            'createur:id,nom,prenom,email,fonction',
+            'membres:id,nom,prenom,email,fonction',
+            'phases.activites.taches.responsable:id,nom,prenom',
+            'phases.activites.taches.racis.utilisateur:id,nom,prenom',
+        ])->findOrFail($id);
+
+        $user = $request->user();
+        $isAdmin = in_array($user->fonction, ['Administrateur', 'Administrateur système']);
+        $isMembre = \App\Models\ParticipationProjet::where('id_projet', $id)
+            ->where('id_utilisateur', $user->id)
+            ->where('statut', 'actif')
+            ->exists();
+        $isCreateur = $projet->id_createur === $user->id;
+
+        if (!$isAdmin && !$isMembre && !$isCreateur) {
+            return response()->json(['message' => 'Accès non autorisé à ce projet.'], 403);
+        }
+
         return response()->json($projet);
     }
 

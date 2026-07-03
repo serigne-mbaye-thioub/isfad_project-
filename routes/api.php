@@ -86,9 +86,19 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     Route::get('/projets', [\App\Http\Controllers\ProjetController::class, 'index']);
     Route::post('/projets', [\App\Http\Controllers\ProjetController::class, 'store']);
     Route::get('/projets/{id}', [\App\Http\Controllers\ProjetController::class, 'show']);
-    Route::post('/projets/{id}/membres', [\App\Http\Controllers\ProjetController::class, 'addMembre']);
     Route::put('/projets/{id}', [\App\Http\Controllers\ProjetController::class, 'update']);
     Route::patch('/projets/{id}/etat-spse', [\App\Http\Controllers\ProjetController::class, 'updateEtatSpse']);
+
+    // ── Module 2 : Gestion des Équipes ─────────────────────────────────────────
+    // Lister les utilisateurs disponibles (non encore membres) — pour les selects du front
+    Route::get('/utilisateurs/disponibles', [\App\Http\Controllers\EquipeController::class, 'utilisateursDispo']);
+    // CRUD équipe d'un projet
+    Route::get('/projets/{id}/equipe', [\App\Http\Controllers\EquipeController::class, 'index']);
+    Route::post('/projets/{id}/equipe', [\App\Http\Controllers\EquipeController::class, 'store']);
+    Route::patch('/projets/{id}/equipe/{participationId}', [\App\Http\Controllers\EquipeController::class, 'updateRole']);
+    Route::delete('/projets/{id}/equipe/{participationId}', [\App\Http\Controllers\EquipeController::class, 'destroy']);
+    // Réaffectation du responsable d'une tâche (avec vérif membership)
+    Route::patch('/taches/{id}/responsable', [\App\Http\Controllers\EquipeController::class, 'reaffecterResponsable']);
 
     // ── Routes Phases ──────────────────────────────────────────────────────────
     Route::post('/projets/{id}/phases', [\App\Http\Controllers\PhaseController::class, 'store']);
