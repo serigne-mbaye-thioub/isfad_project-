@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import api from '../../axios';
+import api from '../axios';
 import { AlertTriangle, Plus } from 'lucide-react';
 
 export const ModalCreateActivite = ({ phases, onClose, onSuccess }) => {
