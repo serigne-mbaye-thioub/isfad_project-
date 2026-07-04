@@ -166,7 +166,7 @@ const ProjetDetail = () => {
             <div className="flex-1 overflow-hidden flex flex-col">
                 {activeTab === 'equipe' ? (
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 overflow-y-auto">
-                        <GestionEquipe projetId={projet.id} currentUserId={currentUser?.id} />
+                        <GestionEquipe projetId={projet.id} currentUser={currentUser} />
                     </div>
                 ) : activeTab === 'budget' ? (
                     <div className="overflow-y-auto h-full">

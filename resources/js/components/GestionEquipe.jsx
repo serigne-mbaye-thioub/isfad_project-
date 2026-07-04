@@ -245,7 +245,7 @@ const CarteMembre = ({ participation, peutGerer, onRetirer, onUpdateRole, isCurr
 };
 
 // ── Composant Principal : GestionEquipe ─────────────────────────────────────
-const GestionEquipe = ({ projetId, currentUserId }) => {
+const GestionEquipe = ({ projetId, currentUser }) => {
     const [equipe, setEquipe] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -266,10 +266,14 @@ const GestionEquipe = ({ projetId, currentUserId }) => {
 
     useEffect(() => { chargerEquipe(); }, [chargerEquipe]);
 
+    const currentUserId = currentUser?.id;
     const currentUserParticipation = equipe?.membres?.find(m => m.utilisateur?.id === currentUserId);
-    const peutGerer = currentUserParticipation
+    
+    const isGlobalManager = ['Administrateur', 'Administrateur système', 'Gestionnaire de projet', 'Chef de projet', 'Superviseur'].includes(currentUser?.fonction);
+    
+    const peutGerer = isGlobalManager || (currentUserParticipation
         ? ['chef_projet', 'gestionnaire'].includes(currentUserParticipation.role_projet)
-        : false;
+        : false);
 
     const handleRetirer = async (participationId, utilisateur) => {
         if (!window.confirm(`Retirer ${utilisateur?.prenom} ${utilisateur?.nom} de l'équipe ?`)) return;
