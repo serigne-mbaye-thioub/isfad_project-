@@ -13,7 +13,7 @@ const Dashboard = () => {
     const [projets, setProjets] = useState([]);
     const [loading, setLoading] = useState(true);
     const currentUser = JSON.parse(localStorage.getItem('auth_user') || '{}');
-    const isAdmin = ['Administrateur', 'Administrateur système'].includes(currentUser?.fonction);
+    const isAdmin = ['Administrateur', 'Administrateur système', 'Gestionnaire de projet'].includes(currentUser?.fonction);
 
     useEffect(() => {
         const fetchData = async () => {

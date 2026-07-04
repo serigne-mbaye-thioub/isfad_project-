@@ -20,7 +20,7 @@ class AdminDashboardController extends Controller
     public function stats(Request $request): JsonResponse
     {
         $user = $request->user();
-        if (!in_array($user->fonction, ['Administrateur', 'Administrateur système'])) {
+        if (!in_array($user->fonction, ['Administrateur', 'Administrateur système', 'Gestionnaire de projet'])) {
             return response()->json(['message' => 'Accès non autorisé.'], 403);
         }
 

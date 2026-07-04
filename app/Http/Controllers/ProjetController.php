@@ -15,16 +15,19 @@ class ProjetController extends Controller
     {
         $user = $request->user();
         
-        // Un Administrateur voit tous les projets
-        if (in_array($user->fonction, ['Administrateur', 'Administrateur système'])) {
+        // Administrateur et Gestionnaire voient tous les projets
+        if (in_array($user->fonction, ['Administrateur', 'Administrateur système', 'Gestionnaire de projet'])) {
             $projets = Projet::with(['createur', 'membres'])->get();
         } else {
-            // Un utilisateur normal voit les projets où il est membre ou créateur
-            $projets = Projet::whereHas('participations', function($q) use ($user) {
-                $q->where('id_utilisateur', $user->id);
-            })->orWhere('id_createur', $user->id)
-              ->with(['createur', 'membres'])
-              ->get();
+            // Un utilisateur normal voit les projets où il est membre actif ou créateur
+            $projets = Projet::where(function($query) use ($user) {
+                $query->whereHas('participations', function($q) use ($user) {
+                    $q->where('id_utilisateur', $user->id)
+                      ->where('statut', 'actif');
+                })->orWhere('id_createur', $user->id);
+            })
+            ->with(['createur', 'membres'])
+            ->get();
         }
 
         return response()->json($projets);
@@ -79,7 +82,7 @@ class ProjetController extends Controller
         ])->findOrFail($id);
 
         $user = $request->user();
-        $isAdmin = in_array($user->fonction, ['Administrateur', 'Administrateur système']);
+        $isAdmin = in_array($user->fonction, ['Administrateur', 'Administrateur système', 'Gestionnaire de projet']);
         $isMembre = \App\Models\ParticipationProjet::where('id_projet', $id)
             ->where('id_utilisateur', $user->id)
             ->where('statut', 'actif')
