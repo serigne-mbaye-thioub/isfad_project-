@@ -262,7 +262,7 @@ const ListeProjets = () => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const navigate = useNavigate();
 
-    const currentUserStr = localStorage.getItem('user');
+    const currentUserStr = localStorage.getItem('auth_user');
     const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
     const isArchitecteOrAdmin = ['Architecte', 'Administrateur', 'Administrateur système'].includes(currentUser?.fonction);
 
