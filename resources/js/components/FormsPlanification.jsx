@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../axios';
 import { AlertTriangle, Plus } from 'lucide-react';
 
@@ -58,6 +58,15 @@ export const ModalCreateTache = ({ phases, projetId, membres = [], onClose, onSu
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [allUsers, setAllUsers] = useState([]);
+    const [loadingUsers, setLoadingUsers] = useState(true);
+
+    useEffect(() => {
+        api.get('/api/utilisateurs')
+            .then(res => setAllUsers(res.data))
+            .catch(err => console.error(err))
+            .finally(() => setLoadingUsers(false));
+    }, []);
 
     // Extraction de toutes les activités depuis les phases
     const toutesActivites = phases.reduce((acc, p) => [...acc, ...(p.activites || [])], []);
@@ -200,11 +209,12 @@ export const ModalCreateTache = ({ phases, projetId, membres = [], onClose, onSu
                                     className="w-full border rounded-lg p-2 text-sm"
                                     value={formData.id_responsable}
                                     onChange={e => setFormData({...formData, id_responsable: e.target.value})}
+                                    disabled={loadingUsers}
                                 >
-                                    <option value="">Sélectionnez un responsable...</option>
-                                    {membres.map(m => (
-                                        <option key={`r-${m.id || m.participation_id}`} value={m.utilisateur?.id || m.id_utilisateur}>
-                                            {m.utilisateur?.prenom} {m.utilisateur?.nom} ({m.role_projet})
+                                    <option value="">{loadingUsers ? 'Chargement...' : 'Sélectionnez un responsable...'}</option>
+                                    {allUsers.map(u => (
+                                        <option key={`r-${u.id}`} value={u.id}>
+                                            {u.prenom} {u.nom} ({u.fonction})
                                         </option>
                                     ))}
                                 </select>
@@ -215,11 +225,12 @@ export const ModalCreateTache = ({ phases, projetId, membres = [], onClose, onSu
                                     className="w-full border rounded-lg p-2 text-sm"
                                     value={formData.id_approbateur}
                                     onChange={e => setFormData({...formData, id_approbateur: e.target.value})}
+                                    disabled={loadingUsers}
                                 >
                                     <option value="">Aucun approbateur...</option>
-                                    {membres.map(m => (
-                                        <option key={`a-${m.id || m.participation_id}`} value={m.utilisateur?.id || m.id_utilisateur}>
-                                            {m.utilisateur?.prenom} {m.utilisateur?.nom} ({m.role_projet})
+                                    {allUsers.map(u => (
+                                        <option key={`a-${u.id}`} value={u.id}>
+                                            {u.prenom} {u.nom} ({u.fonction})
                                         </option>
                                     ))}
                                 </select>
@@ -227,18 +238,19 @@ export const ModalCreateTache = ({ phases, projetId, membres = [], onClose, onSu
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Consultés (C)</label>
                                 <div className="h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white p-2 space-y-1">
-                                    {membres.length === 0 && <p className="text-xs text-gray-400 italic">Aucun membre disponible</p>}
-                                    {membres.map(m => {
-                                        const userId = String(m.utilisateur?.id || m.id_utilisateur);
+                                    {loadingUsers && <p className="text-xs text-gray-400 italic">Chargement...</p>}
+                                    {!loadingUsers && allUsers.length === 0 && <p className="text-xs text-gray-400 italic">Aucun utilisateur disponible</p>}
+                                    {allUsers.map(u => {
+                                        const userId = String(u.id);
                                         return (
-                                            <label key={`c-${m.id || m.participation_id}`} className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer transition">
+                                            <label key={`c-${u.id}`} className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer transition">
                                                 <input 
                                                     type="checkbox" 
                                                     checked={formData.consultes.includes(userId)}
                                                     onChange={() => handleCheckboxChange('consultes', userId)}
                                                     className="w-4 h-4 text-[#0564A8] rounded border-gray-300 focus:ring-[#0564A8]"
                                                 />
-                                                <span className="text-xs font-medium text-gray-700">{m.utilisateur?.prenom} {m.utilisateur?.nom}</span>
+                                                <span className="text-xs font-medium text-gray-700">{u.prenom} {u.nom}</span>
                                             </label>
                                         );
                                     })}
@@ -247,18 +259,19 @@ export const ModalCreateTache = ({ phases, projetId, membres = [], onClose, onSu
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Informés (I)</label>
                                 <div className="h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white p-2 space-y-1">
-                                    {membres.length === 0 && <p className="text-xs text-gray-400 italic">Aucun membre disponible</p>}
-                                    {membres.map(m => {
-                                        const userId = String(m.utilisateur?.id || m.id_utilisateur);
+                                    {loadingUsers && <p className="text-xs text-gray-400 italic">Chargement...</p>}
+                                    {!loadingUsers && allUsers.length === 0 && <p className="text-xs text-gray-400 italic">Aucun utilisateur disponible</p>}
+                                    {allUsers.map(u => {
+                                        const userId = String(u.id);
                                         return (
-                                            <label key={`i-${m.id || m.participation_id}`} className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer transition">
+                                            <label key={`i-${u.id}`} className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer transition">
                                                 <input 
                                                     type="checkbox" 
                                                     checked={formData.informes.includes(userId)}
                                                     onChange={() => handleCheckboxChange('informes', userId)}
                                                     className="w-4 h-4 text-[#0564A8] rounded border-gray-300 focus:ring-[#0564A8]"
                                                 />
-                                                <span className="text-xs font-medium text-gray-700">{m.utilisateur?.prenom} {m.utilisateur?.nom}</span>
+                                                <span className="text-xs font-medium text-gray-700">{u.prenom} {u.nom}</span>
                                             </label>
                                         );
                                     })}
