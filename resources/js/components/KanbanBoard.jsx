@@ -19,8 +19,14 @@ const KanbanTask = ({ task, onClick, onStatutChange, currentUser }) => {
 
     return (
         <div 
+            draggable={peutChangerStatut}
+            onDragStart={(e) => {
+                if (peutChangerStatut) {
+                    e.dataTransfer.setData('taskId', task.id);
+                }
+            }}
             onClick={() => onClick(task)}
-            className={`bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group relative ${isRetard ? 'border-l-4 border-l-red-500' : ''}`}
+            className={`bg-white p-4 rounded-xl shadow-sm border border-gray-100 transition-all cursor-pointer group relative ${isRetard ? 'border-l-4 border-l-red-500' : ''} ${peutChangerStatut ? 'hover:shadow-md hover:border-blue-200 cursor-grab active:cursor-grabbing' : 'opacity-80'}`}
         >
             {isRetard && (
                 <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 bg-red-500 text-white p-1 rounded-full shadow-sm" title="En retard">
@@ -78,7 +84,24 @@ const KanbanTask = ({ task, onClick, onStatutChange, currentUser }) => {
 
 const KanbanColumn = ({ status, tasks, onTaskClick, onStatutChange, currentUser }) => {
     return (
-        <div className="flex flex-col bg-gray-50/50 rounded-2xl border border-gray-100 w-[300px] flex-shrink-0">
+        <div 
+            className="flex flex-col bg-gray-50/50 rounded-2xl border border-gray-100 w-[300px] flex-shrink-0"
+            onDragOver={(e) => {
+                e.preventDefault();
+                e.currentTarget.classList.add('bg-blue-50/50', 'border-blue-200');
+            }}
+            onDragLeave={(e) => {
+                e.currentTarget.classList.remove('bg-blue-50/50', 'border-blue-200');
+            }}
+            onDrop={(e) => {
+                e.preventDefault();
+                e.currentTarget.classList.remove('bg-blue-50/50', 'border-blue-200');
+                const taskId = e.dataTransfer.getData('taskId');
+                if (taskId) {
+                    onStatutChange(taskId, status.id);
+                }
+            }}
+        >
             <div className={`flex items-center justify-between p-4 border-b border-gray-100 rounded-t-2xl bg-white`}>
                 <div className="flex items-center gap-2">
                     <span className={`w-8 h-8 rounded-xl flex items-center justify-center ${status.color}`}>
