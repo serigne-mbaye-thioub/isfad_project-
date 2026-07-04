@@ -24,8 +24,8 @@ const JournalAudit = () => {
     if (loading) return <div className="p-8 text-center animate-pulse">Chargement du journal d'audit...</div>;
 
     const filteredAudits = audits.filter(a => 
-        a.action.toLowerCase().includes(search.toLowerCase()) || 
-        a.description.toLowerCase().includes(search.toLowerCase()) ||
+        (a.action || '').toLowerCase().includes(search.toLowerCase()) || 
+        (a.type_element || '').toLowerCase().includes(search.toLowerCase()) ||
         (a.utilisateur && `${a.utilisateur.prenom} ${a.utilisateur.nom}`.toLowerCase().includes(search.toLowerCase()))
     );
 
@@ -77,7 +77,7 @@ const JournalAudit = () => {
                                         ) : (
                                             <span className="text-xs text-gray-400 italic">Système</span>
                                         )}
-                                        <div className="text-[10px] text-gray-400 mt-0.5 ml-6">IP: {audit.adresse_ip || 'Inconnue'}</div>
+                                        <div className="text-[10px] text-gray-400 mt-0.5 ml-6">IP: {audit.ip_adresse || 'Inconnue'}</div>
                                     </td>
                                     <td className="p-4">
                                         <span className="bg-gray-100 text-gray-700 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider">
@@ -85,7 +85,10 @@ const JournalAudit = () => {
                                         </span>
                                     </td>
                                     <td className="p-4">
-                                        <p className="text-xs text-gray-600">{audit.description}</p>
+                                        <p className="text-xs text-gray-600">
+                                            {audit.type_element && <span className="font-semibold">{audit.type_element} #{audit.id_element} — </span>}
+                                            {audit.nouvelles_valeurs ? JSON.stringify(audit.nouvelles_valeurs).slice(0, 100) : 'Aucun détail'}
+                                        </p>
                                     </td>
                                 </tr>
                             ))}

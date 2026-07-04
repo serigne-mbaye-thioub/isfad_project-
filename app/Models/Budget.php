@@ -26,6 +26,7 @@ class Budget extends Model
         'montant_consomme',
         'devise',
         'note',
+        'annee_fiscale',
     ];
 
     protected function casts(): array

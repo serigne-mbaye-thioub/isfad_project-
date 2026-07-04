@@ -59,7 +59,7 @@ const BudgetProjet = ({ projetId, currentUser }) => {
         }
     };
 
-    const isAdminOrChef = currentUser?.fonction === 'Administrateur' || currentUser?.fonction === 'Chef de projet';
+    const isAdminOrChef = ['Administrateur', 'Administrateur système', 'Chef de projet', 'Gestionnaire de projet'].includes(currentUser?.fonction);
 
     if (loading) return <div className="p-4 text-gray-500 animate-pulse">Chargement du budget...</div>;
 

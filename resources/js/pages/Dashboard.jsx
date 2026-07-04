@@ -10,20 +10,30 @@ const COLORS = ['#0564A8', '#00ACEF', '#10b981', '#f59e0b', '#ef4444', '#64748b'
 
 const Dashboard = () => {
     const [stats, setStats] = useState(null);
+    const [projets, setProjets] = useState([]);
     const [loading, setLoading] = useState(true);
+    const currentUser = JSON.parse(localStorage.getItem('auth_user') || '{}');
+    const isAdmin = ['Administrateur', 'Administrateur système'].includes(currentUser?.fonction);
 
     useEffect(() => {
-        const fetchStats = async () => {
+        const fetchData = async () => {
             try {
-                const res = await api.get('/api/admin/dashboard/stats');
-                setStats(res.data);
+                if (isAdmin) {
+                    // Admin : stats globales
+                    const res = await api.get('/api/admin/dashboard/stats');
+                    setStats(res.data);
+                } else {
+                    // Autres rôles : leurs projets uniquement
+                    const res = await api.get('/api/projets');
+                    setProjets(res.data);
+                }
             } catch (error) {
                 console.error("Erreur lors de la récupération des stats", error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchStats();
+        fetchData();
     }, []);
 
     if (loading) {
@@ -32,6 +42,57 @@ const Dashboard = () => {
                 <div className="flex flex-col items-center gap-4 text-gray-400">
                     <Activity size={32} className="animate-spin text-[#0564A8]" />
                     <p className="font-bold tracking-widest uppercase text-sm">Chargement du tableau de bord...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!isAdmin && !loading) {
+        // Vue simplifiée pour les membres / chefs de projet
+        return (
+            <div className="max-w-7xl mx-auto space-y-6">
+                <div>
+                    <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Mon Tableau de Bord</h1>
+                    <p className="text-gray-500 text-sm mt-1 font-medium">Vos projets et activités en cours.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Mes Projets</p>
+                        <h3 className="text-3xl font-black text-gray-900">{projets.length}</h3>
+                    </div>
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">En cours</p>
+                        <h3 className="text-3xl font-black text-[#0564A8]">{projets.filter(p => p.statut === 'en_cours').length}</h3>
+                    </div>
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Terminés</p>
+                        <h3 className="text-3xl font-black text-emerald-600">{projets.filter(p => p.statut === 'cloture').length}</h3>
+                    </div>
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-50 bg-gray-50/50">
+                        <h3 className="text-sm font-extrabold text-gray-900 uppercase tracking-wider">Mes Projets récents</h3>
+                    </div>
+                    {projets.length === 0 ? (
+                        <p className="p-8 text-center text-gray-400">Vous n'êtes encore membre d'aucun projet.</p>
+                    ) : (
+                        <div className="divide-y divide-gray-50">
+                            {projets.slice(0, 5).map(p => (
+                                <a key={p.id} href={`/projets/${p.id}`} className="flex items-center gap-4 p-4 px-6 hover:bg-gray-50 transition">
+                                    <div className="flex-1">
+                                        <p className="text-sm font-bold text-gray-900">{p.titre}</p>
+                                        <p className="text-xs text-gray-400 capitalize">{p.statut?.replace('_',' ')}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-24 bg-gray-100 rounded-full h-2">
+                                            <div className="bg-[#0564A8] h-2 rounded-full" style={{width: `${p.avancement || 0}%`}}></div>
+                                        </div>
+                                        <span className="text-xs font-bold text-gray-600">{Math.round(p.avancement || 0)}%</span>
+                                    </div>
+                                </a>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         );
