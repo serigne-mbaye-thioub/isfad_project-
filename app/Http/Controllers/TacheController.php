@@ -15,33 +15,32 @@ class TacheController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'id_projet' => 'nullable|exists:projets,id',
-            'id_activite' => 'nullable|exists:activites,id',
-            'titre' => 'required|string|max:200',
-            'description' => 'nullable|string',
-            'priorite' => 'nullable|in:basse,moyenne,haute,critique',
-            'date_debut' => 'required|date',
-            'date_limite' => 'required|date|after_or_equal:date_debut',
-            'id_responsable' => 'required|exists:utilisateurs,id',
+            'id_projet'      => 'nullable|exists:projets,id',
+            'id_activite'    => 'nullable|exists:activites,id',
+            'titre'          => 'required|string|max:200',
+            'description'    => 'nullable|string',
+            'priorite'       => 'nullable|in:basse,moyenne,haute,critique',
+            'date_limite'    => 'required|date',
+            'id_responsable' => 'nullable|exists:utilisateurs,id',
             'id_approbateur' => 'nullable|exists:utilisateurs,id',
         ]);
 
         if (empty($validated['id_projet']) && empty($validated['id_activite'])) {
-            return response()->json(['message' => 'Une tâche doit être obligatoirement rattachée à un projet ou à une activité.'], 422);
+            return response()->json(['message' => 'Une tâche doit être rattachée à un projet ou à une activité.'], 422);
         }
 
-        // Création de la tâche avec R et A
         $tache = Tache::create([
-            'id_projet' => $validated['id_projet'] ?? null,
-            'id_activite' => $validated['id_activite'] ?? null,
-            'titre' => $validated['titre'],
-            'description' => $validated['description'] ?? null,
-            'priorite' => $validated['priorite'] ?? 'moyenne',
-            'date_debut' => $validated['date_debut'],
-            'date_limite' => $validated['date_limite'],
-            'id_responsable' => $validated['id_responsable'],
+            'id_projet'      => $validated['id_projet'] ?? null,
+            'id_activite'    => $validated['id_activite'] ?? null,
+            'titre'          => $validated['titre'],
+            'description'    => $validated['description'] ?? null,
+            'priorite'       => $validated['priorite'] ?? 'moyenne',
+            'date_debut'     => now()->toDateString(), // automatiquement aujourd'hui
+            'date_limite'    => $validated['date_limite'],
+            // Si pas de responsable fourni, le créateur devient responsable par défaut
+            'id_responsable' => $validated['id_responsable'] ?? $request->user()->id,
             'id_approbateur' => $validated['id_approbateur'] ?? null,
-            'statut' => 'a_faire',
+            'statut'         => 'a_faire',
         ]);
 
         return response()->json($tache, 201);

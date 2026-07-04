@@ -44,9 +44,16 @@ export const ModalCreateActivite = ({ phases, onClose, onSuccess }) => {
     );
 };
 
-export const ModalCreateTache = ({ phases, onClose, onSuccess }) => {
-    const [formData, setFormData] = useState({ id_activite: '', titre: '', description: '', priorite: 'moyenne', date_limite: '' });
+export const ModalCreateTache = ({ phases, projetId, onClose, onSuccess }) => {
+    const [formData, setFormData] = useState({
+        id_activite: '',
+        titre: '',
+        description: '',
+        priorite: 'moyenne',
+        date_limite: '',
+    });
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
     // Extraction de toutes les activités depuis les phases
     const toutesActivites = phases.reduce((acc, p) => [...acc, ...(p.activites || [])], []);
@@ -54,11 +61,26 @@ export const ModalCreateTache = ({ phases, onClose, onSuccess }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setError('');
         try {
-            await api.post(`/api/taches`, formData);
+            const payload = {
+                titre:       formData.titre,
+                description: formData.description,
+                priorite:    formData.priorite,
+                date_limite: formData.date_limite,
+            };
+
+            // Rattachement : activité en priorité, sinon le projet directement
+            if (formData.id_activite) {
+                payload.id_activite = formData.id_activite;
+            } else if (projetId) {
+                payload.id_projet = projetId;
+            }
+
+            await api.post(`/api/taches`, payload);
             onSuccess();
         } catch (e) {
-            alert(e.response?.data?.message || 'Erreur création tâche');
+            setError(e.response?.data?.message || 'Erreur lors de la création de la tâche');
         } finally {
             setLoading(false);
         }
@@ -66,28 +88,92 @@ export const ModalCreateTache = ({ phases, onClose, onSuccess }) => {
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 w-full max-w-md">
-                <h3 className="font-bold text-lg mb-4">Nouvelle Tâche</h3>
+            <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                <h3 className="font-bold text-lg mb-1 flex items-center gap-2">
+                    <Plus size={20} className="text-[#0564A8]" /> Nouvelle Tâche
+                </h3>
+                <p className="text-xs text-gray-400 mb-5">Le créateur sera automatiquement désigné responsable.</p>
+
+                {error && (
+                    <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4 flex items-start gap-2">
+                        <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                        {error}
+                    </div>
+                )}
+
                 <div className="space-y-3 mb-6">
-                    <select required className="w-full border rounded-lg p-2 text-sm" value={formData.id_activite} onChange={e => setFormData({...formData, id_activite: e.target.value})}>
-                        <option value="">Sélectionnez une activité parent...</option>
-                        {toutesActivites.map(a => <option key={a.id} value={a.id}>{a.titre}</option>)}
-                    </select>
-                    <input type="text" placeholder="Titre de la tâche" required className="w-full border rounded-lg p-2 text-sm" value={formData.titre} onChange={e => setFormData({...formData, titre: e.target.value})} />
-                    <textarea placeholder="Description" className="w-full border rounded-lg p-2 text-sm" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
-                    <div className="flex gap-2">
-                        <input type="date" required className="w-full border rounded-lg p-2 text-sm" value={formData.date_limite} onChange={e => setFormData({...formData, date_limite: e.target.value})} />
-                        <select className="w-full border rounded-lg p-2 text-sm" value={formData.priorite} onChange={e => setFormData({...formData, priorite: e.target.value})}>
-                            <option value="basse">Basse</option>
-                            <option value="moyenne">Moyenne</option>
-                            <option value="haute">Haute</option>
-                            <option value="critique">Critique</option>
-                        </select>
+                    {/* Activité parente (optionnelle si projet direct) */}
+                    {toutesActivites.length > 0 && (
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">
+                                Activité parente <span className="font-normal text-gray-400">(optionnel)</span>
+                            </label>
+                            <select
+                                className="w-full border rounded-lg p-2 text-sm"
+                                value={formData.id_activite}
+                                onChange={e => setFormData({...formData, id_activite: e.target.value})}
+                            >
+                                <option value="">— Tâche directe du projet —</option>
+                                {toutesActivites.map(a => <option key={a.id} value={a.id}>{a.titre}</option>)}
+                            </select>
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Titre <span className="text-red-500">*</span></label>
+                        <input
+                            type="text"
+                            placeholder="Ex: Rédiger le rapport d'étape"
+                            required
+                            className="w-full border rounded-lg p-2 text-sm"
+                            value={formData.titre}
+                            onChange={e => setFormData({...formData, titre: e.target.value})}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Description</label>
+                        <textarea
+                            placeholder="Détails de la tâche..."
+                            rows={2}
+                            className="w-full border rounded-lg p-2 text-sm resize-none"
+                            value={formData.description}
+                            onChange={e => setFormData({...formData, description: e.target.value})}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Date limite <span className="text-red-500">*</span></label>
+                            <input
+                                type="date"
+                                required
+                                className="w-full border rounded-lg p-2 text-sm"
+                                value={formData.date_limite}
+                                onChange={e => setFormData({...formData, date_limite: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Priorité</label>
+                            <select
+                                className="w-full border rounded-lg p-2 text-sm"
+                                value={formData.priorite}
+                                onChange={e => setFormData({...formData, priorite: e.target.value})}
+                            >
+                                <option value="basse">Basse</option>
+                                <option value="moyenne">Moyenne</option>
+                                <option value="haute">Haute</option>
+                                <option value="critique">Critique</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
-                <div className="flex justify-end gap-2">
+
+                <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
                     <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-100 rounded-lg text-sm font-semibold">Annuler</button>
-                    <button type="submit" disabled={loading} className="px-4 py-2 bg-[#0564A8] text-white rounded-lg text-sm font-bold">Créer</button>
+                    <button type="submit" disabled={loading} className="px-4 py-2 bg-[#0564A8] text-white rounded-lg text-sm font-bold">
+                        {loading ? 'Création...' : 'Créer la tâche'}
+                    </button>
                 </div>
             </form>
         </div>
