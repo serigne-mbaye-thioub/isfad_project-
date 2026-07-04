@@ -97,6 +97,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     Route::get('/projets/{id}', [\App\Http\Controllers\ProjetController::class, 'show']);
     Route::put('/projets/{id}', [\App\Http\Controllers\ProjetController::class, 'update']);
     Route::patch('/projets/{id}/etat-spse', [\App\Http\Controllers\ProjetController::class, 'updateEtatSpse']);
+    Route::post('/projets/{id}/transmettre', [\App\Http\Controllers\ProjetController::class, 'transmettre']);
 
     // ── Module 2 : Gestion des Équipes ─────────────────────────────────────────
     // Lister les utilisateurs disponibles (non encore membres) — pour les selects du front

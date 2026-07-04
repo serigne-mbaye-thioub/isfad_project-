@@ -30,6 +30,9 @@ class Projet extends Model
         'priorite',
         'statut',
         'etat_spse',
+        'fiche_projet',
+        'fiche_fichier',
+        'transmis_gestionnaire',
         'avancement',
         'id_createur',
     ];

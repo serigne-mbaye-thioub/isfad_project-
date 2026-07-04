@@ -15,13 +15,17 @@ class ProjetController extends Controller
     {
         $user = $request->user();
         
-        // Le Gestionnaire (et donc Chef et Superviseur) voit TOUS les projets (vision transversale)
+        // Le Superviseur et Gestionnaire voient TOUS les projets TRANSMIS (ou dont ils sont créateurs/membres)
         if ($user->hasRole('Gestionnaire de projet')) {
-            $projets = Projet::with(['createur', 'membres'])->get();
+            $projets = Projet::where('transmis_gestionnaire', true)
+                ->orWhere('id_createur', $user->id)
+                ->orWhereHas('participations', function($q) use ($user) {
+                    $q->where('id_utilisateur', $user->id)->where('statut', 'actif');
+                })
+                ->with(['createur', 'membres'])
+                ->get();
         } else {
-            // Tous les autres (Gestionnaire, Chef, Membre, Architecte, etc.) ne voient que leurs projets
-            // Exception : l'Admin n'a pas accès au contenu métier des projets par défaut, 
-            // la requête suivante retournera vide pour un admin qui n'est pas affecté.
+            // Tous les autres ne voient que leurs projets
             $projets = Projet::where(function($query) use ($user) {
                 $query->whereHas('participations', function($q) use ($user) {
                     $q->where('id_utilisateur', $user->id)
@@ -41,33 +45,54 @@ class ProjetController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        if (!$user->isAdminGlobally() && !$user->hasRole('Gestionnaire de projet')) {
-            return response()->json(['message' => 'Seul le Gestionnaire de projet ou l\'Administrateur peut créer un projet.'], 403);
+        // Seul l'Architecte (ou Admin) peut créer (ou ceux héritant si applicable)
+        if (!$user->isAdminGlobally() && $user->fonction !== 'Architecte') {
+            return response()->json(['message' => 'Seul l\'Architecte ou l\'Administrateur peut initialiser un projet.'], 403);
         }
 
         $validated = $request->validate([
             'titre' => 'required|string|max:200',
             'description' => 'nullable|string',
+            'fiche_projet' => 'nullable|string',
+            'fichier' => 'nullable|file|mimes:pdf,doc,docx|max:10240', // 10MB max
             'date_debut' => 'required|date',
             'date_fin' => 'required|date|after_or_equal:date_debut',
             'priorite' => 'nullable|in:basse,moyenne,haute,critique',
+            'id_chef_projet' => 'required|exists:utilisateurs,id',
         ]);
+
+        $path = null;
+        if ($request->hasFile('fichier')) {
+            $path = $request->file('fichier')->store('fiches_projets', 'public');
+        }
 
         $projet = Projet::create([
             'titre' => $validated['titre'],
             'description' => $validated['description'] ?? null,
+            'fiche_projet' => $validated['fiche_projet'] ?? null,
+            'fiche_fichier' => $path,
             'date_debut' => $validated['date_debut'],
             'date_fin' => $validated['date_fin'],
             'priorite' => $validated['priorite'] ?? 'moyenne',
             'statut' => 'a_demarrer',
             'avancement' => 0,
-            'id_createur' => $request->user()->id,
+            'id_createur' => $user->id,
+            'transmis_gestionnaire' => false,
         ]);
 
-        // Le créateur est automatiquement Chef de projet
+        // L'Architecte est ajouté comme architecte
         ParticipationProjet::create([
             'id_projet' => $projet->id,
-            'id_utilisateur' => $request->user()->id,
+            'id_utilisateur' => $user->id,
+            'role_projet' => 'architecte',
+            'statut' => 'actif',
+            'date_affectation' => now(),
+        ]);
+
+        // Le Chef de projet désigné est ajouté
+        ParticipationProjet::create([
+            'id_projet' => $projet->id,
+            'id_utilisateur' => $validated['id_chef_projet'],
             'role_projet' => 'chef_projet',
             'statut' => 'actif',
             'date_affectation' => now(),
@@ -91,14 +116,31 @@ class ProjetController extends Controller
         $user = $request->user();
         // Accès global pour le Gestionnaire (et héritiers) ou Admin
         $hasGlobalAccess = $user->hasRole('Gestionnaire de projet') || $user->isAdminGlobally();
-        $isMembre = \App\Models\ParticipationProjet::where('id_projet', $id)
+        $participation = \App\Models\ParticipationProjet::where('id_projet', $id)
             ->where('id_utilisateur', $user->id)
             ->where('statut', 'actif')
-            ->exists();
+            ->first();
+        
+        $isMembre = $participation !== null;
+        $isChefOrMore = $hasGlobalAccess || ($isMembre && in_array($participation->role_projet, ['chef_projet', 'gestionnaire', 'architecte']));
         $isCreateur = $projet->id_createur === $user->id;
 
         if (!$hasGlobalAccess && !$isMembre && !$isCreateur) {
             return response()->json(['message' => 'Accès non autorisé à ce projet.'], 403);
+        }
+
+        // Si c'est juste un membre normal (pas chef, ni gestionnaire, ni admin), 
+        // on ne lui renvoie que les tâches où il est impliqué (R ou dans RACI).
+        if (!$isChefOrMore && !$isCreateur && $projet->phases) {
+            foreach ($projet->phases as $phase) {
+                foreach ($phase->activites as $activite) {
+                    $activite->setRelation('taches', $activite->taches->filter(function($tache) use ($user) {
+                        return $tache->id_responsable === $user->id || 
+                               $tache->id_approbateur === $user->id ||
+                               $tache->racis->contains('id_utilisateur', $user->id);
+                    })->values());
+                }
+            }
         }
 
         return response()->json($projet);
@@ -192,5 +234,24 @@ class ProjetController extends Controller
         $projet->update(['etat_spse' => $validated['etat_spse']]);
 
         return response()->json($projet);
+    }
+    public function transmettre(Request $request, $id)
+    {
+        $projet = Projet::findOrFail($id);
+        
+        $user = $request->user();
+        $participation = ParticipationProjet::where('id_projet', $projet->id)
+                                            ->where('id_utilisateur', $user->id)
+                                            ->first();
+                                            
+        $isChef = $participation && strtolower($participation->role_projet) === 'chef_projet';
+
+        if (!$user->isAdminGlobally() && !$isChef) {
+            return response()->json(['message' => 'Seul le Chef de projet peut transmettre ce projet au gestionnaire.'], 403);
+        }
+
+        $projet->update(['transmis_gestionnaire' => true]);
+
+        return response()->json(['message' => 'Projet transmis au gestionnaire avec succès', 'projet' => $projet]);
     }
 }

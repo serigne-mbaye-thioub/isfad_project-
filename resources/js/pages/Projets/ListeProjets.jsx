@@ -113,16 +113,39 @@ const ProjetCard = ({ projet, onClick }) => {
 // ── Modale de création de projet ─────────────────────────────────────────────
 const ModalCreateProjet = ({ onClose, onSuccess }) => {
     const [formData, setFormData] = useState({
-        titre: '', description: '', date_debut: '', date_fin: '', priorite: 'moyenne'
+        titre: '', description: '', date_debut: '', date_fin: '', priorite: 'moyenne',
+        fiche_projet: '', id_chef_projet: ''
     });
+    const [fichier, setFichier] = useState(null);
+    const [utilisateurs, setUtilisateurs] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    useEffect(() => {
+        // Charger la liste des utilisateurs pour choisir le chef de projet
+        api.get('/api/utilisateurs')
+           .then(res => setUtilisateurs(res.data.data || res.data))
+           .catch(() => setError("Impossible de charger les utilisateurs"));
+    }, []);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!formData.id_chef_projet) {
+            setError("Veuillez désigner un Chef de projet.");
+            return;
+        }
+
         setLoading(true); setError('');
         try {
-            await api.post('/api/projets', formData);
+            const data = new FormData();
+            Object.keys(formData).forEach(key => data.append(key, formData[key]));
+            if (fichier) {
+                data.append('fichier', fichier);
+            }
+
+            await api.post('/api/projets', data, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
             onSuccess();
         } catch (err) {
             setError(err.response?.data?.message || 'Erreur de création.');
@@ -158,10 +181,35 @@ const ModalCreateProjet = ({ onClose, onSuccess }) => {
                         </div>
                         
                         <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wider">Description (Objectifs)</label>
-                            <textarea rows="3" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}
+                            <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wider">Chef de projet <span className="text-red-500">*</span></label>
+                            <select required value={formData.id_chef_projet} onChange={e => setFormData({...formData, id_chef_projet: e.target.value})}
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm">
+                                <option value="">-- Sélectionner le Chef de projet --</option>
+                                {utilisateurs.map(u => (
+                                    <option key={u.id} value={u.id}>{u.prenom} {u.nom} ({u.fonction})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wider">Fiche de projet (Texte)</label>
+                            <textarea rows="3" value={formData.fiche_projet} onChange={e => setFormData({...formData, fiche_projet: e.target.value})}
                                 className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm resize-none"
-                                placeholder="Objectifs principaux, contexte, livrables attendus..." />
+                                placeholder="Rédigez la fiche descriptive du projet..." />
+                        </div>
+                        
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wider">Fiche de projet (Fichier joint)</label>
+                            <input type="file" accept=".pdf,.doc,.docx" onChange={e => setFichier(e.target.files[0])}
+                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm" />
+                            <p className="text-[10px] text-gray-400 mt-1">Formats acceptés : PDF, DOC, DOCX. Max 10Mo.</p>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wider">Description (Objectifs secondaires)</label>
+                            <textarea rows="2" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm resize-none"
+                                placeholder="Objectifs secondaires, contexte..." />
                         </div>
 
                         <div className="grid grid-cols-2 gap-5">
@@ -214,6 +262,10 @@ const ListeProjets = () => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const navigate = useNavigate();
 
+    const currentUserStr = localStorage.getItem('user');
+    const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+    const isArchitecteOrAdmin = ['Architecte', 'Administrateur', 'Administrateur système'].includes(currentUser?.fonction);
+
     const fetchProjets = async () => {
         setLoading(true);
         try {
@@ -253,12 +305,14 @@ const ListeProjets = () => {
                             className="w-full sm:w-64 pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] shadow-sm transition-all"
                         />
                     </div>
-                    <button 
-                        onClick={() => setShowCreateModal(true)}
-                        className="bg-[#0564A8] hover:bg-[#044c80] text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-blue-200 transition-all flex-shrink-0"
-                    >
-                        <Plus size={18} /> <span className="hidden sm:inline">Nouveau projet</span>
-                    </button>
+                    {isArchitecteOrAdmin && (
+                        <button 
+                            onClick={() => setShowCreateModal(true)}
+                            className="bg-[#0564A8] hover:bg-[#044c80] text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-blue-200 transition-all flex-shrink-0"
+                        >
+                            <Plus size={18} /> <span className="hidden sm:inline">Initialiser un projet</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -280,14 +334,16 @@ const ListeProjets = () => {
                     </div>
                     <h3 className="text-xl font-extrabold text-gray-900 mb-2">Aucun projet trouvé</h3>
                     <p className="text-gray-500 mb-8 max-w-md mx-auto">
-                        Vous n'avez pas encore de projet ou aucun projet ne correspond à votre recherche. Initialisez un nouveau projet pour commencer.
+                        Vous n'avez pas encore de projet ou aucun projet ne correspond à votre recherche.
                     </p>
-                    <button 
-                        onClick={() => setShowCreateModal(true)}
-                        className="bg-[#0564A8] hover:bg-[#044c80] text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center gap-2"
-                    >
-                        <Plus size={18} /> Initialiser un projet
-                    </button>
+                    {isArchitecteOrAdmin && (
+                        <button 
+                            onClick={() => setShowCreateModal(true)}
+                            className="bg-[#0564A8] hover:bg-[#044c80] text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center gap-2"
+                        >
+                            <Plus size={18} /> Initialiser un projet
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">

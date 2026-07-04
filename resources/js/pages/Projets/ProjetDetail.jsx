@@ -107,6 +107,28 @@ const ProjetDetail = () => {
                         </div>
                         <h1 className="text-2xl font-extrabold text-gray-900">{projet.titre}</h1>
                         <p className="text-gray-500 text-sm mt-1">{projet.description}</p>
+                        
+                        {!projet.transmis_gestionnaire && currentUser?.fonction === 'Chef de projet' && (
+                            <div className="mt-4">
+                                <button 
+                                    onClick={() => {
+                                        if(window.confirm('Voulez-vous transmettre ce projet au gestionnaire ?')) {
+                                            api.post(`/api/projets/${projet.id}/transmettre`)
+                                               .then(() => window.location.reload())
+                                               .catch(e => alert(e.response?.data?.message || 'Erreur lors de la transmission'));
+                                        }
+                                    }}
+                                    className="text-xs bg-blue-50 text-[#0564A8] px-4 py-2 rounded-lg font-bold hover:bg-blue-100 transition border border-blue-200"
+                                >
+                                    Transmettre au Gestionnaire
+                                </button>
+                            </div>
+                        )}
+                        {!projet.transmis_gestionnaire && currentUser?.fonction === 'Architecte' && (
+                            <div className="mt-4 inline-block text-xs bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded-lg border border-yellow-200 font-semibold">
+                                En attente de transmission par le Chef de projet
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex flex-col items-end gap-3 w-full md:w-auto">
@@ -137,10 +159,16 @@ const ProjetDetail = () => {
             {/* Navigation des onglets */}
             <div className="flex gap-6 border-b border-gray-200 mb-6 flex-shrink-0 px-2 overflow-x-auto">
                 <button 
+                    onClick={() => setActiveTab('fiche')}
+                    className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${activeTab === 'fiche' ? 'border-[#0564A8] text-[#0564A8]' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
+                >
+                    <FolderKanban size={16} /> Fiche Projet
+                </button>
+                <button 
                     onClick={() => setActiveTab('kanban')}
                     className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${activeTab === 'kanban' ? 'border-[#0564A8] text-[#0564A8]' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
                 >
-                    <LayoutDashboard size={16} /> Planification & Kanban
+                    <CheckCircle2 size={16} /> Tâches
                 </button>
                 <button 
                     onClick={() => setActiveTab('equipe')}
@@ -164,7 +192,28 @@ const ProjetDetail = () => {
 
             {/* Contenu de l'onglet */}
             <div className="flex-1 overflow-hidden flex flex-col">
-                {activeTab === 'equipe' ? (
+                {activeTab === 'fiche' ? (
+                    <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 overflow-y-auto">
+                        <h2 className="text-lg font-bold text-gray-900 mb-4">Fiche de Projet</h2>
+                        {projet.fiche_projet ? (
+                            <div className="prose prose-sm text-gray-700 max-w-none whitespace-pre-wrap mb-6">
+                                {projet.fiche_projet}
+                            </div>
+                        ) : (
+                            <p className="text-gray-500 italic mb-6">Aucune description textuelle fournie.</p>
+                        )}
+
+                        {projet.fiche_fichier && (
+                            <div>
+                                <h3 className="text-sm font-bold text-gray-900 mb-2">Document Joint</h3>
+                                <a href={`/storage/${projet.fiche_fichier}`} target="_blank" rel="noreferrer"
+                                   className="inline-flex items-center gap-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 px-4 py-2 rounded-lg text-sm font-medium text-[#0564A8] transition">
+                                    Voir le document joint
+                                </a>
+                            </div>
+                        )}
+                    </div>
+                ) : activeTab === 'equipe' ? (
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 overflow-y-auto">
                         <GestionEquipe projetId={projet.id} currentUser={currentUser} />
                     </div>

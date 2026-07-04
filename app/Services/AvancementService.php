@@ -87,6 +87,13 @@ class AvancementService
         // Moyenne globale pondérée par le nombre d'éléments de premier niveau (phases + taches directes)
         $pourcentage = ($sommePhases + $sommeTaches) / ($totalPhases + $totalTaches);
 
-        $projet->update(['avancement' => $pourcentage]);
+        $dataToUpdate = ['avancement' => $pourcentage];
+        
+        // Archivage automatique si 100%
+        if ($pourcentage == 100 && $projet->statut !== 'archive') {
+            $dataToUpdate['statut'] = 'archive';
+        }
+
+        $projet->update($dataToUpdate);
     }
 }
