@@ -23,6 +23,10 @@ class TacheController extends Controller
             'date_limite'    => 'required|date',
             'id_responsable' => 'nullable|exists:utilisateurs,id',
             'id_approbateur' => 'nullable|exists:utilisateurs,id',
+            'consultes'      => 'nullable|array',
+            'consultes.*'    => 'exists:utilisateurs,id',
+            'informes'       => 'nullable|array',
+            'informes.*'     => 'exists:utilisateurs,id',
         ]);
 
         if (empty($validated['id_projet']) && empty($validated['id_activite'])) {
@@ -37,11 +41,21 @@ class TacheController extends Controller
             'priorite'       => $validated['priorite'] ?? 'moyenne',
             'date_debut'     => now()->toDateString(), // automatiquement aujourd'hui
             'date_limite'    => $validated['date_limite'],
-            // Si pas de responsable fourni, le créateur devient responsable par défaut
             'id_responsable' => $validated['id_responsable'] ?? $request->user()->id,
             'id_approbateur' => $validated['id_approbateur'] ?? null,
             'statut'         => 'a_faire',
         ]);
+
+        if (!empty($validated['consultes'])) {
+            foreach ($validated['consultes'] as $c) {
+                TacheRaci::create(['id_tache' => $tache->id, 'id_utilisateur' => $c, 'role_raci' => 'consulte']);
+            }
+        }
+        if (!empty($validated['informes'])) {
+            foreach ($validated['informes'] as $i) {
+                TacheRaci::create(['id_tache' => $tache->id, 'id_utilisateur' => $i, 'role_raci' => 'informe']);
+            }
+        }
 
         return response()->json($tache, 201);
     }
