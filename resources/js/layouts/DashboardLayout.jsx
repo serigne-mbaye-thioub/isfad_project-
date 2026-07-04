@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, FolderKanban, Calendar, Bell, LogOut, ChevronDown, Shield, FileText } from 'lucide-react';
+import { LayoutDashboard, Users, FolderKanban, Calendar, Bell, LogOut, ChevronDown, Shield, FileText, Wallet } from 'lucide-react';
 import api from '../axios';
 
 const DashboardLayout = () => {
