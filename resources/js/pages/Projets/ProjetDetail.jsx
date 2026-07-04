@@ -33,7 +33,14 @@ const ModalCreatePhase = ({ projetId, onClose, onSuccess }) => {
             <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">Nouvelle Phase</h3>
                 <div className="space-y-3 mb-6">
-                    <input type="text" placeholder="Nom de la phase" required className="w-full border rounded-lg p-2 text-sm" value={formData.nom} onChange={e => setFormData({...formData, nom: e.target.value})} />
+                    <select required className="w-full border rounded-lg p-2 text-sm" value={formData.nom} onChange={e => setFormData({...formData, nom: e.target.value})}>
+                        <option value="">Sélectionnez une phase...</option>
+                        <option value="initialisation">Initialisation</option>
+                        <option value="planification">Planification</option>
+                        <option value="execution">Exécution</option>
+                        <option value="suivi">Suivi et contrôle</option>
+                        <option value="cloture">Clôture</option>
+                    </select>
                     <textarea placeholder="Description" className="w-full border rounded-lg p-2 text-sm" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
                     <div className="flex gap-2">
                         <input type="date" required className="w-full border rounded-lg p-2 text-sm" value={formData.date_debut} onChange={e => setFormData({...formData, date_debut: e.target.value})} />
