@@ -116,9 +116,9 @@ class ProjetController extends Controller
             'role_projet' => 'required|string',
         ]);
         
-        // Vérification des droits : seul l'admin ou le chef de projet peut faire ça
+        // Vérification des droits : Administrateur, ou globalement Gestionnaire, ou Chef sur ce projet
         $user = $request->user();
-        $isAdmin = in_array($user->fonction, ['Administrateur', 'Administrateur système']);
+        $hasGlobalAccess = $user->isAdminGlobally() || $user->hasRole('Gestionnaire de projet');
         
         $participation = ParticipationProjet::where('id_projet', $projet->id)
                                             ->where('id_utilisateur', $user->id)
@@ -126,8 +126,8 @@ class ProjetController extends Controller
                                             
         $isChef = $participation && strtolower($participation->role_projet) === 'chef_projet';
 
-        if (!$isAdmin && !$isChef) {
-            return response()->json(['message' => 'Accès non autorisé. Seul le chef de projet peut ajouter des membres.'], 403);
+        if (!$hasGlobalAccess && !$isChef) {
+            return response()->json(['message' => 'Accès non autorisé. Seul le Gestionnaire ou Chef de projet peut ajouter des membres.'], 403);
         }
         
         // Ajout ou mise à jour du rôle
@@ -145,6 +145,19 @@ class ProjetController extends Controller
     public function update(Request $request, $id)
     {
         $projet = Projet::findOrFail($id);
+
+        $user = $request->user();
+        $hasGlobalAccess = $user->isAdminGlobally() || $user->hasRole('Gestionnaire de projet');
+        
+        $participation = ParticipationProjet::where('id_projet', $projet->id)
+                                            ->where('id_utilisateur', $user->id)
+                                            ->first();
+                                            
+        $isChef = $participation && strtolower($participation->role_projet) === 'chef_projet';
+
+        if (!$hasGlobalAccess && !$isChef) {
+            return response()->json(['message' => 'Accès non autorisé. Seul le Gestionnaire ou Chef de projet peut modifier ce projet.'], 403);
+        }
 
         $validated = $request->validate([
             'titre' => 'string|max:200',
@@ -166,6 +179,11 @@ class ProjetController extends Controller
     public function updateEtatSpse(Request $request, $id)
     {
         $projet = Projet::findOrFail($id);
+
+        $user = $request->user();
+        if (!$user->isAdminGlobally() && !$user->hasRole('Gestionnaire de projet')) {
+            return response()->json(['message' => 'Accès non autorisé. Seul le Gestionnaire peut modifier l\'état SPSE.'], 403);
+        }
 
         $validated = $request->validate([
             'etat_spse' => 'required|in:non_transmis,transmis_spse,pris_en_charge',
