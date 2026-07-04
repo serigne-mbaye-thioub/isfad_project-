@@ -26,9 +26,14 @@ class DashboardController extends Controller
             return $this->getAdminStats();
         }
 
-        // 2. Vue Gestionnaire (et héritiers: Chef, Superviseur) -> Vision globale sur tous les projets
-        if ($user->hasRole('Gestionnaire de projet')) {
+        // 2. Vue Globale : Administrateur système, Superviseur, Gestionnaire de projet (qui ont la vision sur tous les projets)
+        if (($user->hasRole('Gestionnaire de projet') || $user->isAdminGlobally()) && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte') {
             return $this->getSuperviseurStats($user);
+        }
+
+        // 3. Vue Chef de projet et Architecte (vision restreinte à leurs propres projets)
+        if ($user->fonction === 'Chef de projet' || $user->fonction === 'Architecte') {
+            return $this->getGestionnaireStats($user);
         }
 
         // Autres (Membres) -> Pas de tableau de bord décisionnel complexe par défaut
@@ -100,7 +105,7 @@ class DashboardController extends Controller
 
         if ($projetsIds->isEmpty()) {
             return response()->json([
-                'role_vue' => 'Gestionnaire',
+                'role_vue' => $user->fonction,
                 'projets' => ['total' => 0, 'avancement_moyen' => 0, 'par_statut' => []],
                 'taches' => ['en_retard' => 0, 'par_statut' => []],
             ]);
@@ -120,7 +125,7 @@ class DashboardController extends Controller
             ->count();
 
         return response()->json([
-            'role_vue' => 'Gestionnaire',
+            'role_vue' => $user->fonction,
             'projets' => [
                 'total' => $projetsIds->count(),
                 'par_statut' => $projets_statuts,

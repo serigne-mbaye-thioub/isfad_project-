@@ -16,7 +16,9 @@ class ProjetController extends Controller
         $user = $request->user();
         
         // Le Superviseur et Gestionnaire voient TOUS les projets TRANSMIS (ou dont ils sont créateurs/membres)
-        if ($user->hasRole('Gestionnaire de projet')) {
+        // Mais ATTENTION: 'Chef de projet' hérite de 'Gestionnaire' dans Utilisateur.php, 
+        // donc on doit exclure explicitement le 'Chef de projet' (et l'Architecte) de la vision globale.
+        if (($user->hasRole('Gestionnaire de projet') || $user->isAdminGlobally()) && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte') {
             $projets = Projet::where('transmis_gestionnaire', true)
                 ->orWhere('id_createur', $user->id)
                 ->orWhereHas('participations', function($q) use ($user) {
@@ -25,7 +27,7 @@ class ProjetController extends Controller
                 ->with(['createur', 'membres'])
                 ->get();
         } else {
-            // Tous les autres ne voient que leurs projets
+            // Tous les autres (y compris Chef de projet et Architecte) ne voient que leurs projets
             $projets = Projet::where(function($query) use ($user) {
                 $query->whereHas('participations', function($q) use ($user) {
                     $q->where('id_utilisateur', $user->id)
