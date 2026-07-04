@@ -38,14 +38,12 @@ class EquipeController extends Controller
 
     // ─── Helpers privés ───────────────────────────────────────────────────────────
 
-    /**
-     * Vérifie que l'utilisateur courant a le droit de gérer l'équipe du projet.
-     * Retourne true si Admin global, Chef de projet, ou Gestionnaire du projet.
-     */
     private function peutGererEquipe(Utilisateur $user, Projet $projet): bool
     {
-        // Les Admins et tout rôle >= Gestionnaire de projet (donc Chef, Superviseur) ont accès global
-        if ($user->isAdminGlobally() || $user->hasRole('Gestionnaire de projet')) {
+        // Les Admins et le rôle global Gestionnaire de projet (excluant Chef de projet/Architecte) ont accès global SI transmis
+        $isGlobalManager = ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte');
+        
+        if ($user->isAdminGlobally() || ($isGlobalManager && $projet->transmis_gestionnaire)) {
             return true;
         }
 
@@ -55,7 +53,7 @@ class EquipeController extends Controller
             ->where('statut', 'actif')
             ->first();
 
-        return $participation && in_array($participation->role_projet, ['chef_projet', 'gestionnaire']);
+        return $participation && in_array($participation->role_projet, ['chef_projet', 'gestionnaire', 'architecte']);
     }
 
     /**
@@ -80,9 +78,12 @@ class EquipeController extends Controller
         $projet = Projet::findOrFail($id);
         $user = $request->user();
 
-        // Vérification accès : admin ou membre du projet
-        $isAdmin = in_array($user->fonction, ['Administrateur', 'Administrateur système']);
-        if (!$isAdmin && !$this->estMembreActif($user->id, $projet->id)) {
+        // Vérification accès : admin, membre du projet, ou Gestionnaire/Superviseur si le projet est transmis
+        $isAdmin = $user->isAdminGlobally();
+        $isGlobalManager = ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte');
+        $isMembre = $this->estMembreActif($user->id, $projet->id);
+        
+        if (!$isAdmin && !$isMembre && !($isGlobalManager && $projet->transmis_gestionnaire)) {
             return response()->json(['message' => 'Accès non autorisé à ce projet.'], 403);
         }
 

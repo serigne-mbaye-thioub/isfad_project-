@@ -44,13 +44,14 @@ export const ModalCreateActivite = ({ phases, onClose, onSuccess }) => {
     );
 };
 
-export const ModalCreateTache = ({ phases, projetId, onClose, onSuccess }) => {
+export const ModalCreateTache = ({ phases, projetId, membres = [], onClose, onSuccess }) => {
     const [formData, setFormData] = useState({
         id_activite: '',
         titre: '',
         description: '',
         priorite: 'moyenne',
         date_limite: '',
+        id_responsable: '',
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -68,6 +69,7 @@ export const ModalCreateTache = ({ phases, projetId, onClose, onSuccess }) => {
                 description: formData.description,
                 priorite:    formData.priorite,
                 date_limite: formData.date_limite,
+                id_responsable: formData.id_responsable || null,
             };
 
             // Rattachement : activité en priorité, sinon le projet directement
@@ -89,10 +91,9 @@ export const ModalCreateTache = ({ phases, projetId, onClose, onSuccess }) => {
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-                <h3 className="font-bold text-lg mb-1 flex items-center gap-2">
+                <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                     <Plus size={20} className="text-[#0564A8]" /> Nouvelle Tâche
                 </h3>
-                <p className="text-xs text-gray-400 mb-5">Le créateur sera automatiquement désigné responsable.</p>
 
                 {error && (
                     <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4 flex items-start gap-2">
@@ -166,6 +167,23 @@ export const ModalCreateTache = ({ phases, projetId, onClose, onSuccess }) => {
                                 <option value="critique">Critique</option>
                             </select>
                         </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Responsable <span className="text-red-500">*</span></label>
+                        <select
+                            required
+                            className="w-full border rounded-lg p-2 text-sm"
+                            value={formData.id_responsable}
+                            onChange={e => setFormData({...formData, id_responsable: e.target.value})}
+                        >
+                            <option value="">Sélectionnez un responsable...</option>
+                            {membres.map(m => (
+                                <option key={m.id || m.participation_id} value={m.utilisateur?.id || m.id_utilisateur}>
+                                    {m.utilisateur?.prenom} {m.utilisateur?.nom} ({m.role_projet})
+                                </option>
+                            ))}
+                        </select>
                     </div>
                 </div>
 

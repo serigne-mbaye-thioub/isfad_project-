@@ -261,7 +261,7 @@ const ProjetDetail = () => {
                 <ModalCreateActivite phases={projet.phases || []} onClose={() => setShowActiviteModal(false)} onSuccess={() => {setShowActiviteModal(false); fetchProjet();}} />
             )}
             {showTacheModal && (
-                <ModalCreateTache phases={projet.phases || []} projetId={projet.id} onClose={() => setShowTacheModal(false)} onSuccess={() => {setShowTacheModal(false); fetchProjet();}} />
+                <ModalCreateTache phases={projet.phases || []} projetId={projet.id} membres={projet.membres || []} onClose={() => setShowTacheModal(false)} onSuccess={() => {setShowTacheModal(false); fetchProjet();}} />
             )}
         </div>
     );
