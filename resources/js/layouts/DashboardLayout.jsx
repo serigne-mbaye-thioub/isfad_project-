@@ -116,6 +116,23 @@ const DashboardLayout = () => {
                         </NavLink>
                     ))}
 
+                    {/* Modules Bientôt Disponibles */}
+                    <div className="pt-2">
+                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest px-3 mb-3 mt-4">Modules Additionnels</p>
+                        
+                        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-500/50 cursor-not-allowed" title="Bientôt disponible">
+                            <Wallet size={17} />
+                            <span>Budget</span>
+                            <span className="ml-auto text-[8px] uppercase font-black bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded">Bientôt</span>
+                        </div>
+
+                        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-500/50 cursor-not-allowed" title="Bientôt disponible">
+                            <FileText size={17} />
+                            <span>Demandes de chgt.</span>
+                            <span className="ml-auto text-[8px] uppercase font-black bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded">Bientôt</span>
+                        </div>
+                    </div>
+
                     {/* Section Administration (Restreinte) */}
                     {['Administrateur', 'Administrateur système'].includes(user.fonction) && (
                         <div className="pt-6">

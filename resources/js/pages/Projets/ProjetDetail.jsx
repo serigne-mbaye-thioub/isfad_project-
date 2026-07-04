@@ -109,7 +109,21 @@ const ProjetDetail = () => {
                         <p className="text-gray-500 text-sm mt-1">{projet.description}</p>
                     </div>
 
-                    <div className="flex flex-col items-end gap-2 w-full md:w-auto">
+                    <div className="flex flex-col items-end gap-3 w-full md:w-auto">
+                        {currentUser?.fonction === 'Superviseur' && projet.statut !== 'annule' && (
+                            <button 
+                                onClick={() => {
+                                    if(window.confirm('Voulez-vous vraiment annuler ce projet ?')) {
+                                        api.put(`/api/projets/${projet.id}`, { statut: 'annule' })
+                                           .then(() => window.location.reload())
+                                           .catch(e => alert('Erreur lors de l\'annulation'));
+                                    }
+                                }}
+                                className="text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-lg font-bold hover:bg-red-100 transition"
+                            >
+                                Annuler le projet
+                            </button>
+                        )}
                         <div className="flex items-center gap-2">
                             <span className="text-2xl font-black text-[#0564A8]">{Math.round(projet.avancement)}%</span>
                         </div>

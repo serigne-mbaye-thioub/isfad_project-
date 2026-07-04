@@ -15,11 +15,13 @@ class ProjetController extends Controller
     {
         $user = $request->user();
         
-        // Administrateur et Gestionnaire voient tous les projets
-        if (in_array($user->fonction, ['Administrateur', 'Administrateur système', 'Gestionnaire de projet'])) {
+        // Le Superviseur voit TOUS les projets (vision transversale)
+        if ($user->hasRole('Superviseur')) {
             $projets = Projet::with(['createur', 'membres'])->get();
         } else {
-            // Un utilisateur normal voit les projets où il est membre actif ou créateur
+            // Tous les autres (Gestionnaire, Chef, Membre, Architecte, etc.) ne voient que leurs projets
+            // Exception : l'Admin n'a pas accès au contenu métier des projets par défaut, 
+            // la requête suivante retournera vide pour un admin qui n'est pas affecté.
             $projets = Projet::where(function($query) use ($user) {
                 $query->whereHas('participations', function($q) use ($user) {
                     $q->where('id_utilisateur', $user->id)
@@ -82,14 +84,15 @@ class ProjetController extends Controller
         ])->findOrFail($id);
 
         $user = $request->user();
-        $isAdmin = in_array($user->fonction, ['Administrateur', 'Administrateur système', 'Gestionnaire de projet']);
+        // Accès global pour le Superviseur (ou si on veut laisser l'admin accéder en lecture)
+        $hasGlobalAccess = $user->hasRole('Superviseur') || $user->isAdminGlobally();
         $isMembre = \App\Models\ParticipationProjet::where('id_projet', $id)
             ->where('id_utilisateur', $user->id)
             ->where('statut', 'actif')
             ->exists();
         $isCreateur = $projet->id_createur === $user->id;
 
-        if (!$isAdmin && !$isMembre && !$isCreateur) {
+        if (!$hasGlobalAccess && !$isMembre && !$isCreateur) {
             return response()->json(['message' => 'Accès non autorisé à ce projet.'], 403);
         }
 

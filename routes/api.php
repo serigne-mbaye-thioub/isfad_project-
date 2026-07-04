@@ -87,7 +87,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     Route::get('/utilisateurs', [\App\Http\Controllers\UtilisateurController::class, 'index']);
 
     // ── Routes Dashboard & Configurations ──────────────────────────────────────
-    Route::get('/admin/dashboard/stats', [\App\Http\Controllers\AdminDashboardController::class, 'stats']);
+    Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class, 'stats']);
     Route::get('/admin/configurations', [\App\Http\Controllers\ConfigurationController::class, 'index']);
     Route::put('/admin/configurations/{cle}', [\App\Http\Controllers\ConfigurationController::class, 'update']);
 

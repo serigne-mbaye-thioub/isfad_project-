@@ -59,6 +59,48 @@ class Utilisateur extends Authenticatable
         return 'mot_de_passe';
     }
 
+    // ─── RBAC & Hiérarchie des Rôles ──────────────────────────────────────────
+
+    /**
+     * Chaîne d'héritage des rôles métiers (du plus haut au plus bas).
+     * Les rôles non listés ici (Administrateur, Partenaire, etc.) sont indépendants.
+     */
+    public const HIERARCHY = [
+        'Superviseur'            => 30,
+        'Chef de projet'         => 20,
+        'Gestionnaire de projet' => 10,
+    ];
+
+    /**
+     * Vérifie si l'utilisateur possède un rôle spécifique ou un rôle supérieur dans la hiérarchie.
+     */
+    public function hasRole(string $requiredRole): bool
+    {
+        // 1. Si le rôle correspond exactement, c'est OK
+        if ($this->fonction === $requiredRole) {
+            return true;
+        }
+
+        // 2. Si le rôle demandé fait partie de la hiérarchie
+        if (isset(self::HIERARCHY[$requiredRole])) {
+            $requiredLevel = self::HIERARCHY[$requiredRole];
+            $userLevel = self::HIERARCHY[$this->fonction] ?? 0;
+            
+            // Le Superviseur (30) a tous les droits d'un Chef (20) et Gestionnaire (10)
+            return $userLevel >= $requiredLevel;
+        }
+
+        return false;
+    }
+
+    /**
+     * Raccourci pour vérifier si l'utilisateur est un Admin global.
+     */
+    public function isAdminGlobally(): bool
+    {
+        return in_array($this->fonction, ['Administrateur', 'Administrateur système']);
+    }
+
     // ─── Relations ────────────────────────────────────────────────────────────
 
     /** Projets créés/initiés par cet utilisateur */
