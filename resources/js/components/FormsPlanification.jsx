@@ -51,7 +51,6 @@ export const ModalCreateTache = ({ phases, projetId, membres = [], onClose, onSu
         description: '',
         priorite: 'moyenne',
         date_limite: '',
-        date_limite: '',
         id_responsable: '',
         id_approbateur: '',
         consultes: [],
@@ -62,6 +61,20 @@ export const ModalCreateTache = ({ phases, projetId, membres = [], onClose, onSu
 
     // Extraction de toutes les activités depuis les phases
     const toutesActivites = phases.reduce((acc, p) => [...acc, ...(p.activites || [])], []);
+
+    const handleCheckboxChange = (type, id) => {
+        if (type === 'consultes') {
+            const newConsultes = formData.consultes.includes(id)
+                ? formData.consultes.filter(item => item !== id)
+                : [...formData.consultes, id];
+            setFormData({ ...formData, consultes: newConsultes });
+        } else if (type === 'informes') {
+            const newInformes = formData.informes.includes(id)
+                ? formData.informes.filter(item => item !== id)
+                : [...formData.informes, id];
+            setFormData({ ...formData, informes: newInformes });
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -212,34 +225,44 @@ export const ModalCreateTache = ({ phases, projetId, membres = [], onClose, onSu
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Consultés (C) <span className="font-normal text-gray-400 text-[10px]">(Ctrl+Clic pour plusieurs)</span></label>
-                                <select
-                                    multiple
-                                    className="w-full border rounded-lg p-2 text-sm h-24"
-                                    value={formData.consultes}
-                                    onChange={e => setFormData({...formData, consultes: Array.from(e.target.selectedOptions, option => option.value)})}
-                                >
-                                    {membres.map(m => (
-                                        <option key={`c-${m.id || m.participation_id}`} value={m.utilisateur?.id || m.id_utilisateur}>
-                                            {m.utilisateur?.prenom} {m.utilisateur?.nom}
-                                        </option>
-                                    ))}
-                                </select>
+                                <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Consultés (C)</label>
+                                <div className="h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white p-2 space-y-1">
+                                    {membres.length === 0 && <p className="text-xs text-gray-400 italic">Aucun membre disponible</p>}
+                                    {membres.map(m => {
+                                        const userId = String(m.utilisateur?.id || m.id_utilisateur);
+                                        return (
+                                            <label key={`c-${m.id || m.participation_id}`} className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer transition">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={formData.consultes.includes(userId)}
+                                                    onChange={() => handleCheckboxChange('consultes', userId)}
+                                                    className="w-4 h-4 text-[#0564A8] rounded border-gray-300 focus:ring-[#0564A8]"
+                                                />
+                                                <span className="text-xs font-medium text-gray-700">{m.utilisateur?.prenom} {m.utilisateur?.nom}</span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Informés (I) <span className="font-normal text-gray-400 text-[10px]">(Ctrl+Clic pour plusieurs)</span></label>
-                                <select
-                                    multiple
-                                    className="w-full border rounded-lg p-2 text-sm h-24"
-                                    value={formData.informes}
-                                    onChange={e => setFormData({...formData, informes: Array.from(e.target.selectedOptions, option => option.value)})}
-                                >
-                                    {membres.map(m => (
-                                        <option key={`i-${m.id || m.participation_id}`} value={m.utilisateur?.id || m.id_utilisateur}>
-                                            {m.utilisateur?.prenom} {m.utilisateur?.nom}
-                                        </option>
-                                    ))}
-                                </select>
+                                <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Informés (I)</label>
+                                <div className="h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white p-2 space-y-1">
+                                    {membres.length === 0 && <p className="text-xs text-gray-400 italic">Aucun membre disponible</p>}
+                                    {membres.map(m => {
+                                        const userId = String(m.utilisateur?.id || m.id_utilisateur);
+                                        return (
+                                            <label key={`i-${m.id || m.participation_id}`} className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer transition">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={formData.informes.includes(userId)}
+                                                    onChange={() => handleCheckboxChange('informes', userId)}
+                                                    className="w-4 h-4 text-[#0564A8] rounded border-gray-300 focus:ring-[#0564A8]"
+                                                />
+                                                <span className="text-xs font-medium text-gray-700">{m.utilisateur?.prenom} {m.utilisateur?.nom}</span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
                     </div>
