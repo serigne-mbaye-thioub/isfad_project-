@@ -45,7 +45,7 @@ const Avatar = ({ nom, prenom, size = 'md' }) => {
 // ── Modale d'ajout de membre ─────────────────────────────────────────────────
 const ModalAjoutMembre = ({ projetId, onClose, onSuccess }) => {
     const [disponibles, setDisponibles] = useState([]);
-    const [selected, setSelected] = useState('');
+    const [selected, setSelected] = useState([]);
     const [role, setRole] = useState('membre');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -58,20 +58,30 @@ const ModalAjoutMembre = ({ projetId, onClose, onSuccess }) => {
             .finally(() => setLoading(false));
     }, [projetId]);
 
+    const handleCheckboxChange = (id) => {
+        if (selected.includes(id)) {
+            setSelected(selected.filter(item => item !== id));
+        } else {
+            setSelected([...selected, id]);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!selected) return;
+        if (selected.length === 0) return;
         setSaving(true);
         setError('');
         try {
-            await api.post(`/api/projets/${projetId}/equipe`, {
-                id_utilisateur: parseInt(selected),
-                role_projet: role,
-            });
+            await Promise.all(selected.map(id_utilisateur => 
+                api.post(`/api/projets/${projetId}/equipe`, {
+                    id_utilisateur: parseInt(id_utilisateur),
+                    role_projet: role,
+                })
+            ));
             onSuccess();
             onClose();
         } catch (err) {
-            setError(err.response?.data?.message || 'Erreur lors de l\'ajout.');
+            setError(err.response?.data?.message || 'Erreur lors de l\'ajout multiple.');
         } finally {
             setSaving(false);
         }
@@ -105,19 +115,22 @@ const ModalAjoutMembre = ({ projetId, onClose, onSuccess }) => {
                                 <Loader2 size={16} className="animate-spin" /> Chargement...
                             </div>
                         ) : (
-                            <select
-                                value={selected}
-                                onChange={e => setSelected(e.target.value)}
-                                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] text-sm transition"
-                                required
-                            >
-                                <option value="">-- Choisir un utilisateur --</option>
+                            <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg bg-gray-50 p-2 space-y-1">
                                 {disponibles.map(u => (
-                                    <option key={u.id} value={u.id}>
-                                        {u.prenom} {u.nom} — {u.fonction}
-                                    </option>
+                                    <label key={u.id} className="flex items-center gap-3 p-2 hover:bg-white rounded cursor-pointer transition">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={selected.includes(u.id)}
+                                            onChange={() => handleCheckboxChange(u.id)}
+                                            className="w-4 h-4 text-[#0564A8] rounded border-gray-300 focus:ring-[#0564A8]"
+                                        />
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-semibold text-gray-900">{u.prenom} {u.nom}</span>
+                                            <span className="text-xs text-gray-500">{u.fonction}</span>
+                                        </div>
+                                    </label>
                                 ))}
-                            </select>
+                            </div>
                         )}
                         {!loading && disponibles.length === 0 && (
                             <p className="text-xs text-gray-400 mt-1">Tous les utilisateurs actifs sont déjà membres de ce projet.</p>
@@ -142,7 +155,7 @@ const ModalAjoutMembre = ({ projetId, onClose, onSuccess }) => {
                             className="flex-1 py-2.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">
                             Annuler
                         </button>
-                        <button type="submit" disabled={saving || !selected}
+                        <button type="submit" disabled={saving || selected.length === 0}
                             className="flex-1 py-2.5 rounded-lg bg-[#0564A8] hover:bg-[#2897E8] text-white text-sm font-bold transition disabled:opacity-60 flex items-center justify-center gap-2">
                             {saving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
                             {saving ? 'Ajout...' : 'Ajouter'}
