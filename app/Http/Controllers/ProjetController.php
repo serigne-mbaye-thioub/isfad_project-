@@ -15,8 +15,8 @@ class ProjetController extends Controller
     {
         $user = $request->user();
         
-        // Le Superviseur voit TOUS les projets (vision transversale)
-        if ($user->hasRole('Superviseur')) {
+        // Le Gestionnaire (et donc Chef et Superviseur) voit TOUS les projets (vision transversale)
+        if ($user->hasRole('Gestionnaire de projet')) {
             $projets = Projet::with(['createur', 'membres'])->get();
         } else {
             // Tous les autres (Gestionnaire, Chef, Membre, Architecte, etc.) ne voient que leurs projets
@@ -40,6 +40,11 @@ class ProjetController extends Controller
      */
     public function store(Request $request)
     {
+        $user = $request->user();
+        if (!$user->isAdminGlobally() && !$user->hasRole('Gestionnaire de projet')) {
+            return response()->json(['message' => 'Seul le Gestionnaire de projet ou l\'Administrateur peut créer un projet.'], 403);
+        }
+
         $validated = $request->validate([
             'titre' => 'required|string|max:200',
             'description' => 'nullable|string',
@@ -84,8 +89,8 @@ class ProjetController extends Controller
         ])->findOrFail($id);
 
         $user = $request->user();
-        // Accès global pour le Superviseur (ou si on veut laisser l'admin accéder en lecture)
-        $hasGlobalAccess = $user->hasRole('Superviseur') || $user->isAdminGlobally();
+        // Accès global pour le Gestionnaire (et héritiers) ou Admin
+        $hasGlobalAccess = $user->hasRole('Gestionnaire de projet') || $user->isAdminGlobally();
         $isMembre = \App\Models\ParticipationProjet::where('id_projet', $id)
             ->where('id_utilisateur', $user->id)
             ->where('statut', 'actif')

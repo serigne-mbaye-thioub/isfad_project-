@@ -161,7 +161,7 @@ const Dashboard = () => {
             <div>
                 <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Tableau de Bord Décisionnel</h1>
                 <p className="text-gray-500 text-sm mt-1 font-medium">
-                    {isSuperviseur ? 'Vue transversale de tous les projets de la division.' : 'Vue consolidée de vos projets.'}
+                    Vue globale du portefeuille de projets.
                 </p>
             </div>
 

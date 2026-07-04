@@ -26,14 +26,9 @@ class DashboardController extends Controller
             return $this->getAdminStats();
         }
 
-        // 2. Vue Superviseur (Consolidée / Transversale)
-        if ($user->hasRole('Superviseur')) {
-            return $this->getSuperviseurStats();
-        }
-
-        // 3. Vue Chef de projet / Gestionnaire (Uniquement leurs projets)
+        // 2. Vue Gestionnaire (et héritiers: Chef, Superviseur) -> Vision globale sur tous les projets
         if ($user->hasRole('Gestionnaire de projet')) {
-            return $this->getGestionnaireStats($user);
+            return $this->getSuperviseurStats($user);
         }
 
         // Autres (Membres) -> Pas de tableau de bord décisionnel complexe par défaut
@@ -60,7 +55,7 @@ class DashboardController extends Controller
         ]);
     }
 
-    private function getSuperviseurStats(): JsonResponse
+    private function getSuperviseurStats(Utilisateur $user): JsonResponse
     {
         // KPI globaux sur TOUS les projets
         $projets_statuts = Projet::selectRaw('statut, count(*) as total')->groupBy('statut')->get();
@@ -76,7 +71,7 @@ class DashboardController extends Controller
         $budget_consomme = Depense::where('statut', 'approuvee')->sum('montant') ?? 0;
 
         return response()->json([
-            'role_vue' => 'Superviseur',
+            'role_vue' => $user->fonction,
             'projets' => [
                 'par_statut' => $projets_statuts,
                 'par_etat_spse' => $projets_spse,

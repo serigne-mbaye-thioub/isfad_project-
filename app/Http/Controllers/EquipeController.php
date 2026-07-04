@@ -44,10 +44,12 @@ class EquipeController extends Controller
      */
     private function peutGererEquipe(Utilisateur $user, Projet $projet): bool
     {
-        if (in_array($user->fonction, ['Administrateur', 'Administrateur système'])) {
+        // Les Admins et tout rôle >= Gestionnaire de projet (donc Chef, Superviseur) ont accès global
+        if ($user->isAdminGlobally() || $user->hasRole('Gestionnaire de projet')) {
             return true;
         }
 
+        // Sinon, vérifier si l'utilisateur est explicitement Chef ou Gestionnaire sur CE projet précis
         $participation = ParticipationProjet::where('id_projet', $projet->id)
             ->where('id_utilisateur', $user->id)
             ->where('statut', 'actif')
