@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Clock, CheckCircle2, AlertTriangle, AlertCircle, PlayCircle, MoreHorizontal } from 'lucide-react';
+import { Clock, CheckCircle2, AlertTriangle, AlertCircle, PlayCircle } from 'lucide-react';
 import api from '../axios';
+import ModalDetailTache from './ModalDetailTache';
 
 const STATUSES = [
     { id: 'a_faire', label: 'À faire', color: 'bg-gray-100 text-gray-700 border-gray-200', icon: <AlertCircle size={14} /> },
@@ -112,6 +113,8 @@ const KanbanColumn = ({ status, tasks, onTaskClick, onStatutChange, currentUser 
 };
 
 const KanbanBoard = ({ taches = [], onTaskUpdate, currentUser }) => {
+    const [selectedTask, setSelectedTask] = useState(null);
+
     const handleStatutChange = async (taskId, newStatut) => {
         try {
             await api.patch(`/api/taches/${taskId}/statut`, { statut: newStatut });
@@ -122,21 +125,27 @@ const KanbanBoard = ({ taches = [], onTaskUpdate, currentUser }) => {
     };
 
     return (
-        <div className="flex gap-6 overflow-x-auto pb-4 pt-2 -mx-2 px-2 items-start">
-            {STATUSES.map(status => {
-                const columnTasks = taches.filter(t => t.statut === status.id);
-                return (
-                    <KanbanColumn
-                        key={status.id}
-                        status={status}
-                        tasks={columnTasks}
-                        onTaskClick={(t) => console.log("Task click", t)} // TODO Modale de vue tâche
-                        onStatutChange={handleStatutChange}
-                        currentUser={currentUser}
-                    />
-                );
-            })}
-        </div>
+        <>
+            <div className="flex gap-6 overflow-x-auto pb-4 pt-2 -mx-2 px-2 items-start">
+                {STATUSES.map(status => {
+                    const columnTasks = taches.filter(t => t.statut === status.id);
+                    return (
+                        <KanbanColumn
+                            key={status.id}
+                            status={status}
+                            tasks={columnTasks}
+                            onTaskClick={setSelectedTask}
+                            onStatutChange={handleStatutChange}
+                            currentUser={currentUser}
+                        />
+                    );
+                })}
+            </div>
+
+            {selectedTask && (
+                <ModalDetailTache task={selectedTask} onClose={() => setSelectedTask(null)} />
+            )}
+        </>
     );
 };
 
