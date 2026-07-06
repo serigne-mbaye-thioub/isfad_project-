@@ -9,6 +9,35 @@ use Illuminate\Http\Request;
 class TacheController extends Controller
 {
     /**
+     * Vérifie si un utilisateur a le droit de créer/modifier des tâches pour un projet/activité.
+     */
+    private function peutGererTache($user, $id_projet, $id_activite = null)
+    {
+        if ($user->isAdminGlobally() || ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet')) {
+            return true; // Accès global
+        }
+
+        if (!$id_projet && $id_activite) {
+            $activite = \App\Models\Activite::with('phase')->find($id_activite);
+            if ($activite) {
+                $id_projet = $activite->id_projet ?? $activite->phase?->id_projet;
+                if ($activite->id_responsable === $user->id) return true;
+            }
+        }
+
+        if ($id_projet) {
+            $participation = \App\Models\ParticipationProjet::where('id_projet', $id_projet)
+                ->where('id_utilisateur', $user->id)
+                ->where('statut', 'actif')
+                ->first();
+            if ($participation && in_array($participation->role_projet, ['chef_projet', 'gestionnaire', 'architecte'])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Création d'une tâche.
      * Peut être liée soit à un projet (id_projet) soit à une activité (id_activite).
      */
@@ -31,6 +60,10 @@ class TacheController extends Controller
 
         if (empty($validated['id_projet']) && empty($validated['id_activite'])) {
             return response()->json(['message' => 'Une tâche doit être rattachée à un projet ou à une activité.'], 422);
+        }
+
+        if (!$this->peutGererTache($request->user(), $validated['id_projet'] ?? null, $validated['id_activite'] ?? null)) {
+            return response()->json(['message' => 'Accès non autorisé. Seul le Chef de projet, Gestionnaire, ou Responsable d\'activité peut créer une tâche.'], 403);
         }
 
         $tache = Tache::create([
@@ -153,6 +186,10 @@ class TacheController extends Controller
     public function update(Request $request, $id)
     {
         $tache = Tache::findOrFail($id);
+
+        if (!$this->peutGererTache($request->user(), $tache->id_projet, $tache->id_activite)) {
+            return response()->json(['message' => 'Accès non autorisé. Seul le Chef de projet, Gestionnaire, ou Responsable d\'activité peut modifier les informations de cette tâche.'], 403);
+        }
 
         $validated = $request->validate([
             'titre' => 'string|max:200',

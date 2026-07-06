@@ -27,12 +27,12 @@ class DashboardController extends Controller
         }
 
         // 2. Vue Globale : Administrateur système, Superviseur, Gestionnaire de projet (qui ont la vision sur tous les projets)
-        if (($user->hasRole('Gestionnaire de projet') || $user->isAdminGlobally()) && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte') {
+        if (($user->hasRole('Gestionnaire de projet') || $user->isAdminGlobally()) && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet') {
             return $this->getSuperviseurStats($user);
         }
 
         // 3. Vue Chef de projet et Architecte (vision restreinte à leurs propres projets)
-        if ($user->fonction === 'Chef de projet' || $user->fonction === 'Architecte') {
+        if ($user->fonction === 'Chef de projet' || $user->fonction === 'Architecte de projet') {
             return $this->getGestionnaireStats($user);
         }
 

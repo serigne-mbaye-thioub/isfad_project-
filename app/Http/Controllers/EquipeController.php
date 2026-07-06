@@ -41,7 +41,7 @@ class EquipeController extends Controller
     private function peutGererEquipe(Utilisateur $user, Projet $projet): bool
     {
         // Les Admins et le rôle global Gestionnaire de projet (excluant Chef de projet/Architecte) ont accès global SI transmis
-        $isGlobalManager = ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte');
+        $isGlobalManager = ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet');
         
         if ($user->isAdminGlobally() || ($isGlobalManager && $projet->transmis_gestionnaire)) {
             return true;
@@ -80,7 +80,7 @@ class EquipeController extends Controller
 
         // Vérification accès : admin, membre du projet, ou Gestionnaire/Superviseur si le projet est transmis
         $isAdmin = $user->isAdminGlobally();
-        $isGlobalManager = ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte');
+        $isGlobalManager = ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet');
         $isMembre = $this->estMembreActif($user->id, $projet->id);
         
         if (!$isAdmin && !$isMembre && !($isGlobalManager && $projet->transmis_gestionnaire)) {

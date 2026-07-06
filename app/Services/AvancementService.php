@@ -89,9 +89,11 @@ class AvancementService
 
         $dataToUpdate = ['avancement' => $pourcentage];
         
-        // Archivage automatique si 100%
-        if ($pourcentage == 100 && $projet->statut !== 'archive') {
-            $dataToUpdate['statut'] = 'archive';
+        // Changement automatique de statut selon l'avancement
+        if ($pourcentage > 0 && $pourcentage < 100 && $projet->statut === 'a_demarrer') {
+            $dataToUpdate['statut'] = 'en_cours';
+        } elseif ($pourcentage == 100 && $projet->statut !== 'archive') {
+            $dataToUpdate['statut'] = 'archive'; // Ou cloture selon la règle d'affaire, mais conservons archive
         }
 
         $projet->update($dataToUpdate);

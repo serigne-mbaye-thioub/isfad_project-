@@ -18,7 +18,7 @@ class ProjetController extends Controller
         // Le Superviseur et Gestionnaire voient TOUS les projets TRANSMIS (ou dont ils sont créateurs/membres)
         // Mais ATTENTION: 'Chef de projet' hérite de 'Gestionnaire' dans Utilisateur.php, 
         // donc on doit exclure explicitement le 'Chef de projet' (et l'Architecte) de la vision globale.
-        if (($user->hasRole('Gestionnaire de projet') || $user->isAdminGlobally()) && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte') {
+        if (($user->hasRole('Gestionnaire de projet') || $user->isAdminGlobally()) && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet') {
             $projets = Projet::where('transmis_gestionnaire', true)
                 ->orWhere('id_createur', $user->id)
                 ->orWhereHas('participations', function($q) use ($user) {
@@ -48,8 +48,8 @@ class ProjetController extends Controller
     {
         $user = $request->user();
         // Seul l'Architecte (ou Admin) peut créer (ou ceux héritant si applicable)
-        if (!$user->isAdminGlobally() && $user->fonction !== 'Architecte') {
-            return response()->json(['message' => 'Seul l\'Architecte ou l\'Administrateur peut initialiser un projet.'], 403);
+        if (!$user->isAdminGlobally() && $user->fonction !== 'Architecte de projet') {
+            return response()->json(['message' => 'Seul l\'Architecte de projet ou l\'Administrateur peut initialiser un projet.'], 403);
         }
 
         $validated = $request->validate([

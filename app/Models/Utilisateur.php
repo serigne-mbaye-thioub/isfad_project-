@@ -76,17 +76,21 @@ class Utilisateur extends Authenticatable
      */
     public function hasRole(string $requiredRole): bool
     {
-        // 1. Si le rôle correspond exactement, c'est OK
+        // 1. Un Administrateur a tous les droits par défaut
+        if ($this->isAdminGlobally()) {
+            return true;
+        }
+
+        // 2. Si le rôle correspond exactement, c'est OK
         if ($this->fonction === $requiredRole) {
             return true;
         }
 
-        // 2. Si le rôle demandé fait partie de la hiérarchie
+        // 3. Si le rôle demandé fait partie de la hiérarchie
         if (isset(self::HIERARCHY[$requiredRole])) {
             $requiredLevel = self::HIERARCHY[$requiredRole];
             $userLevel = self::HIERARCHY[$this->fonction] ?? 0;
             
-            // Le Superviseur (30) a tous les droits d'un Chef (20) et Gestionnaire (10)
             return $userLevel >= $requiredLevel;
         }
 

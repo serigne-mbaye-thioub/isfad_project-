@@ -17,8 +17,18 @@ class BudgetController extends Controller
     {
         $projet = Projet::findOrFail($idProjet);
 
-        // Seuls le Chef de projet, Gestionnaire, et Administrateur peuvent voir le budget
-        // (Simplification : on suppose que ces rôles ont accès au backend)
+        $user = request()->user();
+        $isGlobalAdmin = $user->isAdminGlobally() || ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet');
+        
+        $isChef = \App\Models\ParticipationProjet::where('id_projet', $idProjet)
+            ->where('id_utilisateur', $user->id)
+            ->where('role_projet', 'chef_projet')
+            ->where('statut', 'actif')
+            ->exists();
+
+        if (!$isGlobalAdmin && !$isChef) {
+            return response()->json(['message' => 'Accès non autorisé. Seul le Chef de projet, le Gestionnaire ou l\'Administrateur peut voir le budget.'], 403);
+        }
 
         $budget = Budget::where('id_projet', $idProjet)
             ->with(['depenses' => function ($query) {
@@ -52,6 +62,13 @@ class BudgetController extends Controller
      */
     public function storeOrUpdate(Request $request, int $idProjet): JsonResponse
     {
+        $user = $request->user();
+        $isGlobalAdmin = $user->isAdminGlobally() || ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet');
+        
+        if (!$isGlobalAdmin) {
+            return response()->json(['message' => 'Accès non autorisé. Seul le Gestionnaire de projet ou l\'Administrateur peut modifier le budget.'], 403);
+        }
+
         $validated = $request->validate([
             'montant_initial' => 'required|numeric|min:0',
             'devise'         => 'nullable|string|max:10',

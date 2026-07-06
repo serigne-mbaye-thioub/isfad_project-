@@ -26,11 +26,15 @@ const ChangePassword = () => {
         setLoading(true);
         setError('');
         try {
-            await api.post('/api/change-password', {
+            const response = await api.post('/api/change-password', {
                 mot_de_passe_actuel: current,
                 nouveau_mot_de_passe: newPass,
                 nouveau_mot_de_passe_confirmation: confirm,
             });
+
+            // Mettre à jour le token de session avec le nouveau token généré
+            const { access_token } = response.data;
+            localStorage.setItem('auth_token', access_token);
 
             // Mettre à jour premiere_connexion dans le localStorage
             const user = JSON.parse(localStorage.getItem('auth_user') || '{}');

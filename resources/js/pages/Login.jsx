@@ -165,7 +165,7 @@ const Login = () => {
                                     </div>
                                     <span className="inline-flex items-center gap-2 bg-[#e8f4fd] text-[#0564A8] px-3 py-1 rounded-full text-[11px] font-bold tracking-widest uppercase mb-5 select-none">
                                         <span className="w-1.5 h-1.5 rounded-full bg-[#00ACEF] animate-pulse"></span>
-                                        GOUVERNANCE · UCAD
+                                        GOUVERNANCE · ISFAD
                                     </span>
                                     <h1 className="text-2xl font-extrabold text-gray-900 mb-1">Connexion</h1>
                                     <p className="text-gray-400 text-sm">Accédez à votre espace de travail</p>
@@ -254,14 +254,14 @@ const Login = () => {
                         <div className="absolute -bottom-8 -left-8 w-40 h-40 rounded-full bg-white/5"></div>
                         <div className="inline-flex items-center gap-2 bg-black/20 backdrop-blur px-4 py-1.5 rounded-full text-xs font-bold tracking-widest uppercase mb-6">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                            Progiciel de Gestion Intégré
+                            Gouvernance
                         </div>
                         <h2 className="text-3xl font-extrabold mb-3 leading-tight relative z-10">
                             Bienvenue dans votre<br/>
                             <span className="text-[#00ACEF]">Espace Gouvernance</span>
                         </h2>
                         <p className="text-blue-200 text-sm font-medium tracking-wide uppercase relative z-10">
-                            Université Cheikh Anta Diop de Dakar
+                            Institut Supérieur de Formation à Distance
                         </p>
                     </div>
 
@@ -289,8 +289,8 @@ const Login = () => {
             <footer className="bg-[#071525] text-white py-8 px-10 border-t border-white/5">
                 <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-6 text-sm">
                     <div>
-                        <p className="font-extrabold text-base tracking-widest uppercase mb-0.5">ISFAD · UCAD</p>
-                        <p className="text-blue-300/70 text-xs">Institut Supérieur de Formation À Distance · Université Cheikh Anta Diop de Dakar</p>
+                        <p className="font-extrabold text-base tracking-widest uppercase mb-0.5">ISFAD</p>
+                        <p className="text-blue-300/70 text-xs">Institut Supérieur de Formation à Distance</p>
                     </div>
                     <div className="flex gap-12">
                         <div>

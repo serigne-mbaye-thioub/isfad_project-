@@ -10,10 +10,36 @@ use Illuminate\Http\Request;
 class DemandeChangementController extends Controller
 {
     /**
+     * Helper pour vérifier l'appartenance au projet.
+     */
+    private function checkAccess($user, $idProjet, $requireAdminOrChef = false): bool
+    {
+        $isGlobalAdmin = $user->isAdminGlobally() || ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet');
+        if ($isGlobalAdmin) return true;
+
+        $participation = \App\Models\ParticipationProjet::where('id_projet', $idProjet)
+            ->where('id_utilisateur', $user->id)
+            ->where('statut', 'actif')
+            ->first();
+
+        if (!$participation) return false;
+
+        if ($requireAdminOrChef) {
+            return in_array($participation->role_projet, ['chef_projet', 'gestionnaire', 'architecte']);
+        }
+
+        return true; // Simple membre
+    }
+
+    /**
      * Lister les demandes de changement d'un projet.
      */
-    public function index(int $idProjet): JsonResponse
+    public function index(Request $request, int $idProjet): JsonResponse
     {
+        if (!$this->checkAccess($request->user(), $idProjet)) {
+            return response()->json(['message' => 'Accès non autorisé.'], 403);
+        }
+
         $projet = Projet::findOrFail($idProjet);
         
         $demandes = DemandeChangement::where('id_projet', $idProjet)
@@ -29,6 +55,10 @@ class DemandeChangementController extends Controller
      */
     public function store(Request $request, int $idProjet): JsonResponse
     {
+        if (!$this->checkAccess($request->user(), $idProjet)) {
+            return response()->json(['message' => 'Accès non autorisé.'], 403);
+        }
+
         $validated = $request->validate([
             'titre' => 'required|string|max:255',
             'description' => 'required|string',
@@ -58,12 +88,16 @@ class DemandeChangementController extends Controller
      */
     public function updateStatut(Request $request, int $id): JsonResponse
     {
+        $demande = DemandeChangement::findOrFail($id);
+
+        if (!$this->checkAccess($request->user(), $demande->id_projet, true)) {
+            return response()->json(['message' => 'Accès non autorisé. Seul le Chef de projet, Gestionnaire, ou l\'Administrateur peut statuer sur cette demande.'], 403);
+        }
+
         $validated = $request->validate([
             'statut' => 'required|in:en_analyse,approuvee,rejetee,appliquee',
             'commentaire_decision' => 'nullable|string',
         ]);
-
-        $demande = DemandeChangement::findOrFail($id);
         
         $demande->statut = $validated['statut'];
         

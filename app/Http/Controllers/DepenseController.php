@@ -24,6 +24,19 @@ class DepenseController extends Controller
         ]);
 
         $budget = Budget::findOrFail($idBudget);
+        
+        $user = $request->user();
+        $isGlobalAdmin = $user->isAdminGlobally() || ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet');
+        
+        $isChef = \App\Models\ParticipationProjet::where('id_projet', $budget->id_projet)
+            ->where('id_utilisateur', $user->id)
+            ->where('role_projet', 'chef_projet')
+            ->where('statut', 'actif')
+            ->exists();
+
+        if (!$isGlobalAdmin && !$isChef) {
+            return response()->json(['message' => 'Accès non autorisé. Seul le Chef de projet, le Gestionnaire ou l\'Administrateur peut ajouter une dépense.'], 403);
+        }
 
         $depense = new Depense($validated);
         $depense->id_budget = $budget->id;
@@ -49,7 +62,14 @@ class DepenseController extends Controller
             'commentaire_approbateur' => 'nullable|string',
         ]);
 
-        $depense = Depense::findOrFail($id);
+        $depense = Depense::with('budget')->findOrFail($id);
+        
+        $user = $request->user();
+        $isGlobalAdmin = $user->isAdminGlobally() || ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet');
+        
+        if (!$isGlobalAdmin) {
+            return response()->json(['message' => 'Accès non autorisé. Seul le Gestionnaire de projet ou l\'Administrateur peut approuver ou rejeter une dépense.'], 403);
+        }
         
         $depense->statut = $validated['statut'];
         $depense->id_approbateur = $request->user()->id;
