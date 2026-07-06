@@ -1,58 +1,111 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# ISFAD Project
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Bienvenue sur le dépôt du projet ISFAD. Il s'agit d'une application web de gestion complète, développée avec un backend Laravel et un frontend React moderne.
 
-## About Laravel
+## 🚀 Fonctionnalités Principales
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Authentification Sécurisée** : Connexion, changement de mot de passe et protection des routes.
+- **Tableau de Bord (Dashboard)** : Vue d'ensemble avec des graphiques interactifs (Recharts).
+- **Gestion des Projets** : Liste des projets et détails approfondis de chaque projet.
+- **Gestion des Réunions** : Planification et suivi des réunions.
+- **Administration** : 
+  - Gestion des utilisateurs.
+  - Journal d'audit (Audit logs) pour suivre les actions sur la plateforme.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## 🛠️ Stack Technique
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Backend
+- **Framework** : Laravel (PHP 8.3+)
+- **Base de données** : SQLite (par défaut, configurable via `.env`)
 
-## Learning Laravel
+### Frontend
+- **Bibliothèque** : React 19
+- **Routage** : React Router DOM
+- **Stylisation** : Tailwind CSS v4
+- **Composants UI / Icônes** : Lucide React
+- **Graphiques** : Recharts
+- **Build Tool** : Vite
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## ⚙️ Prérequis
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Assurez-vous d'avoir installé les éléments suivants sur votre machine :
+- [PHP](https://www.php.net/) >= 8.3
+- [Composer](https://getcomposer.org/)
+- [Node.js](https://nodejs.org/) & NPM (ou Yarn/Bun)
+- Git
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+## 📦 Installation et Configuration
 
-## Agentic Development
+Suivez ces étapes pour configurer le projet localement :
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+1. **Cloner le dépôt**
+   ```bash
+   git clone <url-du-depot>
+   cd isfad_project-
+   ```
 
-```bash
-composer require laravel/boost --dev
+2. **Installer les dépendances PHP (Backend)**
+   ```bash
+   composer install
+   ```
 
-php artisan boost:install
-```
+3. **Installer les dépendances Node.js (Frontend)**
+   ```bash
+   npm install
+   ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+4. **Configuration de l'environnement**
+   Copiez le fichier d'exemple `.env.example` pour créer votre propre fichier `.env`.
+   ```bash
+   cp .env.example .env
+   ```
 
-## Contributing
+5. **Générer la clé d'application Laravel**
+   ```bash
+   php artisan key:generate
+   ```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+6. **Créer et migrer la base de données**
+   Assurez-vous que votre base de données est configurée dans le fichier `.env` (par défaut, une base SQLite est utilisée).
+   ```bash
+   php artisan migrate --seed
+   ```
 
-## Code of Conduct
+7. **Lancer les serveurs de développement**
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+   Il est recommandé d'utiliser deux terminaux :
 
-## Security Vulnerabilities
+   *Terminal 1 (Backend Laravel) :*
+   ```bash
+   php artisan serve
+   ```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+   *Terminal 2 (Frontend Vite) :*
+   ```bash
+   npm run dev
+   ```
 
-## License
+   Vous pouvez maintenant accéder à l'application via `http://localhost:8000`.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## 📂 Structure du projet
+
+- `/app` : Logique métier du backend (Contrôleurs, Modèles, etc.)
+- `/routes` : Définition des routes API et Web Laravel.
+- `/resources/js` : Contient toute l'application React.
+  - `/pages` : Vues principales de l'application (Login, Dashboard, Projets, Admin, etc.)
+  - `/components` : Composants React réutilisables.
+  - `/layouts` : Mises en page (DashboardLayout, etc.)
+  - `router.jsx` : Configuration des routes frontend.
+- `/database` : Migrations et Seeders de la base de données.
+
+## 🤝 Contribution
+
+1. Forkez le projet.
+2. Créez votre branche de fonctionnalité (`git checkout -b feature/AmazingFeature`).
+3. Commitez vos changements (`git commit -m 'Add some AmazingFeature'`).
+4. Poussez vers la branche (`git push origin feature/AmazingFeature`).
+5. Ouvrez une Pull Request.
+
+## 📄 Licence
+
+Ce projet est sous licence MIT.
