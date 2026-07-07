@@ -62,79 +62,122 @@ class DashboardController extends Controller
 
     private function getSuperviseurStats(Utilisateur $user): JsonResponse
     {
-        // KPI globaux sur TOUS les projets
-        $projets_statuts = Projet::selectRaw('statut, count(*) as total')->groupBy('statut')->get();
-        $projets_spse = Projet::selectRaw('etat_spse, count(*) as total')->groupBy('etat_spse')->get();
-        $avancement_moyen = Projet::whereNotIn('statut', ['cloture', 'archive', 'annule'])->avg('avancement') ?? 0;
-        
-        $taches_statuts = Tache::selectRaw('statut, count(*) as total')->groupBy('statut')->get();
-        $taches_en_retard = Tache::whereIn('statut', ['a_faire', 'en_cours', 'en_revision'])
-            ->where('date_limite', '<', now()->startOfDay())
-            ->count();
-
-        $budget_alloue = Budget::sum('montant_initial') ?? 0;
-        $budget_consomme = Depense::where('statut', 'approuvee')->sum('montant') ?? 0;
-
-        return response()->json([
-            'role_vue' => $user->fonction,
-            'projets' => [
-                'par_statut' => $projets_statuts,
-                'par_etat_spse' => $projets_spse,
-                'avancement_moyen' => round($avancement_moyen, 2),
-                'total' => Projet::count(),
-            ],
-            'taches' => [
-                'en_retard' => $taches_en_retard,
-                'par_statut' => $taches_statuts,
-            ],
-            'finances' => [
-                'alloue' => (float) $budget_alloue,
-                'consomme' => (float) $budget_consomme,
-            ],
-        ]);
+        $projetsIds = Projet::pluck('id')->toArray();
+        return $this->buildDecisionDashboard($user, $projetsIds);
     }
 
     private function getGestionnaireStats(Utilisateur $user): JsonResponse
     {
-        // Projets où l'utilisateur est membre actif ou créateur
         $projetsIds = Projet::where(function($query) use ($user) {
             $query->whereHas('participations', function($q) use ($user) {
                 $q->where('id_utilisateur', $user->id)->where('statut', 'actif');
             })->orWhere('id_createur', $user->id);
-        })->pluck('id');
+        })->pluck('id')->toArray();
+        
+        return $this->buildDecisionDashboard($user, $projetsIds);
+    }
 
-        if ($projetsIds->isEmpty()) {
-            return response()->json([
-                'role_vue' => $user->fonction,
-                'projets' => ['total' => 0, 'avancement_moyen' => 0, 'par_statut' => []],
-                'taches' => ['en_retard' => 0, 'par_statut' => []],
-            ]);
-        }
+    private function buildDecisionDashboard(Utilisateur $user, array $projetsIds): JsonResponse
+    {
+        // KPIs
+        $totalProjets = count($projetsIds);
+        $totalTaches = Tache::whereIn('id_projet', $projetsIds)->count();
+        $tachesEnCours = Tache::whereIn('id_projet', $projetsIds)->where('statut', 'en_cours')->count();
+        $tachesEnRetard = Tache::whereIn('id_projet', $projetsIds)->whereIn('statut', ['a_faire', 'en_cours', 'en_revision'])->where('date_limite', '<', now()->startOfDay())->count();
+        
+        $reunionsAVenir = \App\Models\Reunion::where('statut', 'planifiee')
+            ->where('date_reunion', '>=', now())
+            ->where(function ($q) use ($user, $projetsIds) {
+                if (!empty($projetsIds)) {
+                    $q->whereIn('id_projet', $projetsIds)
+                      ->orWhere('id_organisateur', $user->id)
+                      ->orWhereHas('participants', function ($q2) use ($user) {
+                          $q2->where('id_utilisateur', $user->id);
+                      });
+                } else {
+                    $q->where('id_organisateur', $user->id)
+                      ->orWhereHas('participants', function ($q2) use ($user) {
+                          $q2->where('id_utilisateur', $user->id);
+                      });
+                }
+            })->count();
 
-        $projets_statuts = Projet::whereIn('id', $projetsIds)
-            ->selectRaw('statut, count(*) as total')->groupBy('statut')->get();
-        $avancement_moyen = Projet::whereIn('id', $projetsIds)
+        $projetsARisque = Projet::whereIn('id', $projetsIds)
+            ->where(function($q) {
+                $q->where('statut', 'suspendu')
+                  ->orWhere('priorite', 'critique');
+            })->count();
+
+        // Avancement des 5 projets récents
+        $avancementProjets = Projet::whereIn('id', $projetsIds)
             ->whereNotIn('statut', ['cloture', 'archive', 'annule'])
-            ->avg('avancement') ?? 0;
+            ->orderBy('updated_at', 'desc')
+            ->limit(5)
+            ->get(['id', 'titre', 'avancement']);
 
-        $taches_statuts = Tache::whereIn('id_projet', $projetsIds)
-            ->selectRaw('statut, count(*) as total')->groupBy('statut')->get();
-        $taches_en_retard = Tache::whereIn('id_projet', $projetsIds)
-            ->whereIn('statut', ['a_faire', 'en_cours', 'en_revision'])
-            ->where('date_limite', '<', now()->startOfDay())
+        // Actions requises
+        $demandesEnAttente = \App\Models\Reunion::where('statut', 'en_attente')
+            ->whereIn('id_projet', empty($projetsIds) ? [0] : $projetsIds)
             ->count();
 
+        $tachesCritiques = Tache::whereIn('id_projet', empty($projetsIds) ? [0] : $projetsIds)
+            ->whereIn('statut', ['a_faire', 'en_cours'])
+            ->where('priorite', 'critique')
+            ->with('responsable:id,nom,prenom')
+            ->orderBy('date_limite', 'asc')
+            ->limit(3)
+            ->get(['id', 'titre', 'date_limite', 'id_responsable']);
+
+        // Tâches terminées par mois (6 derniers mois)
+        $sixMonthsAgo = now()->subMonths(5)->startOfMonth();
+        $tachesTerminees = Tache::whereIn('id_projet', empty($projetsIds) ? [0] : $projetsIds)
+            ->where('statut', 'terminee')
+            ->whereNotNull('date_cloture')
+            ->where('date_cloture', '>=', $sixMonthsAgo)
+            ->get(['date_cloture']);
+        
+        $months = [];
+        $moisFr = [1=>'Jan', 2=>'Fév', 3=>'Mar', 4=>'Avr', 5=>'Mai', 6=>'Juin', 7=>'Juil', 8=>'Aoû', 9=>'Sep', 10=>'Oct', 11=>'Nov', 12=>'Déc'];
+        
+        for ($i = 5; $i >= 0; $i--) {
+            $m = now()->subMonths($i);
+            $key = $m->format('Y-m');
+            $months[$key] = [
+                'label' => $moisFr[(int)$m->format('n')],
+                'count' => 0
+            ];
+        }
+        
+        foreach ($tachesTerminees as $t) {
+            $key = \Carbon\Carbon::parse($t->date_cloture)->format('Y-m');
+            if (isset($months[$key])) {
+                $months[$key]['count']++;
+            }
+        }
+
+        // Répartition des tâches par statut
+        $tachesStatuts = Tache::whereIn('id_projet', empty($projetsIds) ? [0] : $projetsIds)
+            ->selectRaw('statut, count(*) as total')
+            ->groupBy('statut')
+            ->get();
+
         return response()->json([
-            'role_vue' => $user->fonction,
-            'projets' => [
-                'total' => $projetsIds->count(),
-                'par_statut' => $projets_statuts,
-                'avancement_moyen' => round($avancement_moyen, 2),
+            'role_vue' => 'Gestionnaire',
+            'kpis' => [
+                'projets_geres' => $totalProjets,
+                'total_taches' => $totalTaches,
+                'taches_en_cours' => $tachesEnCours,
+                'taches_en_retard' => $tachesEnRetard,
+                'reunions_a_venir' => $reunionsAVenir,
+                'projets_a_risque' => $projetsARisque,
             ],
-            'taches' => [
-                'en_retard' => $taches_en_retard,
-                'par_statut' => $taches_statuts,
+            'avancement_projets' => $avancementProjets,
+            'actions_requises' => [
+                'demandes_changement' => $demandesEnAttente,
+                'taches_critiques' => $tachesCritiques,
             ],
+            'taches_terminees_mois' => array_values($months),
+            'repartition_taches' => $tachesStatuts,
         ]);
     }
 }

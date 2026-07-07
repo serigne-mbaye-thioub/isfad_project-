@@ -4,7 +4,10 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
     PieChart, Pie, Cell, LineChart, Line
 } from 'recharts';
-import { Users, FolderKanban, AlertTriangle, TrendingUp, Wallet, Clock, Activity, Target } from 'lucide-react';
+import { 
+    Users, FolderKanban, AlertTriangle, TrendingUp, Wallet, Clock, Activity, Target,
+    Folder, CheckSquare, Settings, Phone, BellRing, User, AlertCircle
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const COLORS = ['#0564A8', '#00ACEF', '#10b981', '#f59e0b', '#ef4444', '#64748b'];
@@ -143,114 +146,223 @@ const Dashboard = () => {
     }
 
     // 3. Vue Superviseur / Chef de projet / Gestionnaire
-    const isSuperviseur = stats.role_vue === 'Superviseur';
     
-    const formatChartData = (dataArray) => {
-        if (!dataArray) return [];
-        return dataArray.map(item => ({
-            name: item.statut?.replace(/_/g, ' ').toUpperCase() || item.etat_spse?.toUpperCase() || 'INCONNU',
-            value: parseInt(item.total, 10)
-        }));
+    // --- Helpers pour le Donut des Statuts ---
+    const STATUT_COLORS = {
+        'A FAIRE': '#f59e0b',      // Orange
+        'EN COURS': '#0564A8',     // Bleu
+        'EN REVISION': '#8b5cf6',  // Violet
+        'TERMINEE': '#10b981'      // Vert
     };
+    
+    const formatStatutName = (statut) => statut?.replace(/_/g, ' ').toUpperCase() || 'INCONNU';
+    
+    const tachesDonutData = stats.repartition_taches?.map(item => ({
+        name: formatStatutName(item.statut),
+        value: parseInt(item.total, 10),
+        color: STATUT_COLORS[formatStatutName(item.statut)] || '#64748b'
+    })) || [];
 
-    const projetsData = formatChartData(stats.projets.par_statut);
-    const tachesData = formatChartData(stats.taches.par_statut);
-
-    return (
-        <div className="max-w-7xl mx-auto space-y-6">
-            <div>
-                <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Tableau de Bord Décisionnel</h1>
-                <p className="text-gray-500 text-sm mt-1 font-medium">
-                    Vue globale du portefeuille de projets.
+    // Jauges d'avancement des projets
+    const CustomAvancementGauge = ({ projet }) => {
+        const value = parseInt(projet.avancement, 10) || 0;
+        const color = value === 100 ? '#10b981' : '#0564A8'; // Vert si fini, Bleu sinon
+        const data = [{ name: 'A', value: value }, { name: 'B', value: 100 - value }];
+        
+        return (
+            <div className="flex flex-col items-center justify-center gap-3 w-40">
+                <div className="w-24 h-24 relative">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie
+                                data={data} cx="50%" cy="50%"
+                                innerRadius={32} outerRadius={42}
+                                startAngle={90} endAngle={-270}
+                                dataKey="value" stroke="none"
+                            >
+                                <Cell fill={color} />
+                                <Cell fill="#f1f5f9" />
+                            </Pie>
+                        </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="font-extrabold text-gray-900 text-lg">{value}%</span>
+                    </div>
+                </div>
+                <p className="text-[11px] font-bold text-gray-600 text-center leading-tight line-clamp-2 px-2 h-8">
+                    {projet.titre}
                 </p>
             </div>
+        );
+    };
 
-            {/* KPIs */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex items-center justify-between">
+    return (
+        <div className="max-w-[1400px] mx-auto space-y-6">
+            <div>
+                <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight mb-6">Tableau de bord</h1>
+            </div>
+
+            {/* LIGNE 1 : KPIs */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="bg-white rounded-2xl p-5 border-l-4 border-[#0564A8] border-y border-r border-gray-100 shadow-sm flex items-center justify-between">
                     <div>
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Projets</p>
-                        <h3 className="text-3xl font-black text-gray-900">{stats.projets.total}</h3>
-                        <p className="text-xs text-emerald-600 font-bold mt-2 flex items-center gap-1">
-                            <TrendingUp size={12} /> Avancement : {stats.projets.avancement_moyen}%
+                        <h3 className="text-3xl font-black text-[#0564A8] leading-none mb-1">{stats.kpis?.projets_geres}</h3>
+                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Projets gérés</p>
+                    </div>
+                    <Folder size={28} className="text-[#0564A8] opacity-80" />
+                </div>
+                <div className="bg-white rounded-2xl p-5 border-l-4 border-emerald-500 border-y border-r border-gray-100 shadow-sm flex items-center justify-between">
+                    <div>
+                        <h3 className="text-3xl font-black text-emerald-600 leading-none mb-1">{stats.kpis?.total_taches}</h3>
+                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total des tâches</p>
+                    </div>
+                    <CheckSquare size={28} className="text-emerald-500 opacity-80" />
+                </div>
+                <div className="bg-white rounded-2xl p-5 border-l-4 border-orange-400 border-y border-r border-gray-100 shadow-sm flex items-center justify-between">
+                    <div>
+                        <h3 className="text-3xl font-black text-orange-500 leading-none mb-1">{stats.kpis?.taches_en_cours}</h3>
+                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Tâches en cours</p>
+                    </div>
+                    <Settings size={28} className="text-orange-400 opacity-80" />
+                </div>
+                <div className="bg-white rounded-2xl p-5 border-l-4 border-red-500 border-y border-r border-gray-100 shadow-sm flex items-center justify-between">
+                    <div>
+                        <h3 className="text-3xl font-black text-red-500 leading-none mb-1">{stats.kpis?.taches_en_retard}</h3>
+                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Tâches en retard</p>
+                    </div>
+                    <AlertTriangle size={28} className="text-red-500 opacity-80" />
+                </div>
+                <div className="bg-white rounded-2xl p-5 border-l-4 border-purple-500 border-y border-r border-gray-100 shadow-sm flex items-center justify-between">
+                    <div>
+                        <h3 className="text-3xl font-black text-purple-600 leading-none mb-1">{stats.kpis?.reunions_a_venir}</h3>
+                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Réunions à venir</p>
+                    </div>
+                    <Phone size={28} className="text-purple-500 opacity-80" />
+                </div>
+                <div className="bg-white rounded-2xl p-5 border-l-4 border-rose-500 border-y border-r border-gray-100 shadow-sm flex items-center justify-between">
+                    <div>
+                        <h3 className="text-3xl font-black text-rose-500 leading-none mb-1">{stats.kpis?.projets_a_risque}</h3>
+                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Projets à risque</p>
+                    </div>
+                    <BellRing size={28} className="text-rose-500 opacity-80" />
+                </div>
+            </div>
+
+            {/* LIGNE 2 : Avancement + Actions */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* Avancement des projets */}
+                <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                    <h3 className="text-sm font-extrabold text-gray-900 mb-6">Avancement des projets</h3>
+                    <div className="flex flex-wrap items-center justify-start gap-8 min-h-[160px]">
+                        {stats.avancement_projets?.map(projet => (
+                            <CustomAvancementGauge key={projet.id} projet={projet} />
+                        ))}
+                        {(!stats.avancement_projets || stats.avancement_projets.length === 0) && (
+                            <p className="text-gray-400 text-sm w-full text-center">Aucun projet en cours.</p>
+                        )}
+                    </div>
+                </div>
+
+                {/* Actions requises & tâches critiques */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                    <h3 className="text-sm font-extrabold text-gray-900 mb-6">Actions requises & tâches critiques</h3>
+                    
+                    {/* Alerte demandes */}
+                    <div className="bg-orange-50/50 border border-orange-100 rounded-xl p-3 flex items-center gap-3 mb-5">
+                        <AlertCircle size={18} className="text-orange-500 flex-shrink-0" />
+                        <p className="text-xs font-bold text-orange-700">
+                            {stats.actions_requises?.demandes_changement} demande(s) de changement en attente.
                         </p>
                     </div>
-                    <div className="w-12 h-12 rounded-full bg-blue-50 text-[#0564A8] flex items-center justify-center">
-                        <FolderKanban size={24} />
+
+                    {/* Liste Tâches critiques */}
+                    <div className="space-y-3">
+                        {stats.actions_requises?.taches_critiques?.map(tache => (
+                            <div key={tache.id} className="bg-red-50/30 border border-red-50 rounded-xl p-3 flex gap-3">
+                                <div className="w-2 h-2 rounded-full bg-red-500 mt-1.5 flex-shrink-0"></div>
+                                <div>
+                                    <p className="text-[13px] font-bold text-gray-800 leading-tight mb-1">{tache.titre}</p>
+                                    <div className="flex items-center gap-3 text-[11px] text-gray-500 font-medium">
+                                        <span className="flex items-center gap-1"><User size={12}/> {tache.responsable?.prenom} {tache.responsable?.nom}</span>
+                                        <span className="flex items-center gap-1"><Clock size={12}/> {tache.date_limite}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        {(!stats.actions_requises?.taches_critiques || stats.actions_requises.taches_critiques.length === 0) && (
+                            <p className="text-gray-400 text-xs italic text-center py-4">Aucune tâche critique.</p>
+                        )}
                     </div>
                 </div>
 
-                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Tâches en retard</p>
-                        <h3 className="text-3xl font-black text-red-500">{stats.taches.en_retard}</h3>
-                        <p className="text-xs text-gray-400 font-medium mt-2">Nécessite votre attention</p>
-                    </div>
-                    <div className="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center">
-                        <AlertTriangle size={24} />
-                    </div>
-                </div>
-
-                {isSuperviseur && stats.finances && (
-                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Budget Consommé</p>
-                            <h3 className="text-2xl font-black text-gray-900">
-                                {new Intl.NumberFormat('fr-FR', { notation: "compact", maximumFractionDigits: 1 }).format(stats.finances.consomme)}
-                            </h3>
-                            <p className="text-xs text-gray-400 font-medium mt-2">
-                                sur {new Intl.NumberFormat('fr-FR', { notation: "compact", maximumFractionDigits: 1 }).format(stats.finances.alloue)}
-                            </p>
-                        </div>
-                        <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center">
-                            <Wallet size={24} />
-                        </div>
-                    </div>
-                )}
             </div>
 
-            {/* Graphiques */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* LIGNE 3 : Graphiques */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* Tâches terminées par mois */}
+                <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                    <h3 className="text-sm font-extrabold text-gray-900 mb-6">Tâches terminées par mois (6 derniers mois)</h3>
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={stats.taches_terminees_mois} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 600 }} />
+                                {/* Label pour indiquer la valeur au dessus de chaque barre */}
+                                <Tooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                <Bar dataKey="count" fill="#0d9488" radius={[4, 4, 4, 4]} barSize={40}>
+                                    {/* Optional: Add LabelList here if you want numbers on top */}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Répartition par statut */}
                 <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-                    <h3 className="text-sm font-extrabold text-gray-900 mb-6 uppercase tracking-wider">Répartition des Projets (Statut)</h3>
-                    <div className="h-72">
-                        {projetsData.length > 0 ? (
+                    <h3 className="text-sm font-extrabold text-gray-900 mb-6">Répartition des tâches par statut</h3>
+                    <div className="flex h-64 items-center">
+                        <div className="w-1/2 h-full relative">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
-                                    <Pie data={projetsData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
-                                        {projetsData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                    <Pie
+                                        data={tachesDonutData} cx="50%" cy="50%"
+                                        innerRadius={60} outerRadius={80}
+                                        paddingAngle={2} dataKey="value" stroke="none"
+                                    >
+                                        {tachesDonutData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
                                     </Pie>
-                                    <RechartsTooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                                    <Legend verticalAlign="bottom" height={36} iconType="circle" />
                                 </PieChart>
                             </ResponsiveContainer>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-gray-400 text-sm">Aucune donnée disponible.</div>
-                        )}
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                <span className="font-black text-3xl text-gray-900 leading-none">{stats.kpis?.total_taches}</span>
+                                <span className="text-[10px] font-bold text-gray-400 uppercase mt-1">au total</span>
+                            </div>
+                        </div>
+                        <div className="w-1/2 pl-4 flex flex-col justify-center gap-3">
+                            {tachesDonutData.map(item => (
+                                <div key={item.name} className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 rounded-sm" style={{backgroundColor: item.color}}></div>
+                                        <span className="text-[11px] font-bold text-gray-700 capitalize">{item.name.toLowerCase()}</span>
+                                    </div>
+                                    <div className="flex gap-2 text-[11px]">
+                                        <span className="font-black text-gray-900">{item.value}</span>
+                                        <span className="text-gray-400 font-medium">
+                                            {stats.kpis?.total_taches > 0 ? Math.round((item.value / stats.kpis.total_taches) * 100) : 0}%
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-                    <h3 className="text-sm font-extrabold text-gray-900 mb-6 uppercase tracking-wider">Volume de Tâches</h3>
-                    <div className="h-72">
-                        {tachesData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={tachesData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }} barSize={40}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} />
-                                    <RechartsTooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                                    <Bar dataKey="value" fill="#0564A8" radius={[6, 6, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-gray-400 text-sm">Aucune donnée disponible.</div>
-                        )}
-                    </div>
-                </div>
             </div>
 
-            {renderProjectsList()}
         </div>
     );
 };
