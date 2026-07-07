@@ -47,9 +47,9 @@ class ProjetController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        // Seul l'Architecte (ou Admin) peut créer (ou ceux héritant si applicable)
-        if (!$user->isAdminGlobally() && $user->fonction !== 'Architecte de projet') {
-            return response()->json(['message' => 'Seul l\'Architecte de projet ou l\'Administrateur peut initialiser un projet.'], 403);
+        // Seul l'Architecte peut créer
+        if ($user->fonction !== 'Architecte de projet' && $user->fonction !== 'Architecte') {
+            return response()->json(['message' => 'Seul l\'Architecte de projet peut initialiser un projet.'], 403);
         }
 
         $validated = $request->validate([

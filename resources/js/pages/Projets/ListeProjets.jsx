@@ -264,7 +264,7 @@ const ListeProjets = () => {
 
     const currentUserStr = localStorage.getItem('auth_user');
     const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
-    const isArchitecteOrAdmin = ['Architecte', 'Administrateur', 'Administrateur système'].includes(currentUser?.fonction);
+    const isArchitecteOrAdmin = ['Architecte', 'Architecte de projet'].includes(currentUser?.fonction);
 
     const fetchProjets = async () => {
         setLoading(true);

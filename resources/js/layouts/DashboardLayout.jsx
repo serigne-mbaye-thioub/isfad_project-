@@ -68,10 +68,11 @@ const DashboardLayout = () => {
 
     const initials = `${user.prenom?.[0] || ''}${user.nom?.[0] || ''}`.toUpperCase() || 'U';
 
-    // Bug fix #7 : utiliser NavLink de React Router (pas href="#")
     const navItems = [
         { to: '/dashboard', icon: <LayoutDashboard size={17} />, label: 'Tableau de bord' },
-        { to: '/projets', icon: <FolderKanban size={17} />, label: 'Projets' },
+        ...(!['Administrateur', 'Administrateur système'].includes(user.fonction) 
+            ? [{ to: '/projets', icon: <FolderKanban size={17} />, label: 'Projets' }] 
+            : []),
         { to: '/reunions', icon: <Calendar size={17} />, label: 'Réunions' },
     ];
 
