@@ -71,9 +71,11 @@ const DashboardLayout = () => {
     const navItems = [
         { to: '/dashboard', icon: <LayoutDashboard size={17} />, label: 'Tableau de bord' },
         ...(!['Administrateur', 'Administrateur système'].includes(user.fonction) 
-            ? [{ to: '/projets', icon: <FolderKanban size={17} />, label: 'Projets' }] 
+            ? [
+                { to: '/projets', icon: <FolderKanban size={17} />, label: 'Projets' },
+                { to: '/reunions', icon: <Calendar size={17} />, label: 'Réunions' }
+              ] 
             : []),
-        { to: '/reunions', icon: <Calendar size={17} />, label: 'Réunions' },
     ];
 
 

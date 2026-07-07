@@ -80,13 +80,16 @@ class ReunionController extends Controller
         ]);
 
         $user = $request->user();
+
+        // L'Administrateur n'a pas le droit d'organiser des réunions
+        if (in_array($user->fonction, ['Administrateur', 'Administrateur système'])) {
+            return response()->json(['message' => 'L\'Administrateur n\'est pas autorisé à organiser des réunions.'], 403);
+        }
         
         // Déterminer le statut selon les droits
         $statut = 'en_attente';
         
-        if (in_array($user->fonction, ['Administrateur', 'Administrateur système'])) {
-            $statut = 'planifiee';
-        } elseif ($validated['id_projet'] ?? false) {
+        if ($validated['id_projet'] ?? false) {
             $participation = ParticipationProjet::where('id_projet', $validated['id_projet'])
                 ->where('id_utilisateur', $user->id)->first();
                 

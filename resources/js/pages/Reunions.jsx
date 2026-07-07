@@ -106,13 +106,14 @@ const Reunions = () => {
     const [activeTab, setActiveTab] = useState('mes_reunions');
 
     const currentUser = JSON.parse(localStorage.getItem('auth_user') || '{}');
-    const isAdminOrChef = ['Administrateur', 'Administrateur système', 'Chef de projet', 'Gestionnaire de projet', 'Superviseur'].includes(currentUser?.fonction);
+    const isChef = ['Chef de projet', 'Gestionnaire de projet', 'Superviseur'].includes(currentUser?.fonction);
+    const canOrganize = !['Administrateur', 'Administrateur système'].includes(currentUser?.fonction);
 
     const fetchData = async () => {
         try {
             const [resReunions, resDemandes, resUtils, resProjets] = await Promise.all([
                 api.get('/api/reunions/mes-reunions'),
-                isAdminOrChef ? api.get('/api/reunions/demandes') : Promise.resolve({ data: [] }),
+                isChef ? api.get('/api/reunions/demandes') : Promise.resolve({ data: [] }),
                 api.get('/api/utilisateurs'),
                 api.get('/api/projets')
             ]);
@@ -147,12 +148,14 @@ const Reunions = () => {
                     <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Réunions & Événements</h1>
                     <p className="text-gray-500 text-sm mt-1 font-medium">Gérez vos réunions, comités et points de synchronisation.</p>
                 </div>
-                <button onClick={() => setShowModal(true)} className="bg-[#0564A8] text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200">
-                    <Plus size={18} /> Organiser une réunion
-                </button>
+                {canOrganize && (
+                    <button onClick={() => setShowModal(true)} className="bg-[#0564A8] text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200">
+                        <Plus size={18} /> Organiser une réunion
+                    </button>
+                )}
             </div>
 
-            {isAdminOrChef && (
+            {isChef && (
                 <div className="flex gap-6 border-b border-gray-200 mb-6 flex-shrink-0 px-2">
                     <button 
                         onClick={() => setActiveTab('mes_reunions')}
