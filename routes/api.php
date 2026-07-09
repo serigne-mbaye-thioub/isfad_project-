@@ -48,6 +48,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
      * Met à jour le profil (nom, prenom, telephone).
      */
     Route::put('/me', [AuthController::class, 'updateProfile']);
+    Route::put('/me/password', [AuthController::class, 'updatePassword']);
+    Route::post('/me/photo', [AuthController::class, 'updatePhoto']);
 
     // ── Routes Notifications ───────────────────────────────────────────────────
     Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index']);
@@ -77,27 +79,32 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     /**
      * Routes Administration
      */
-    Route::get('/admin/users', [AdminUserController::class, 'index']);
-    Route::post('/admin/users', [AdminUserController::class, 'store']);
-    Route::patch('/admin/users/{id}/statut', [AdminUserController::class, 'updateStatut']);
-    
-    Route::get('/admin/audits', [\App\Http\Controllers\AuditController::class, 'index']);
+    Route::middleware('admin')->group(function () {
+        Route::get('/admin/users', [AdminUserController::class, 'index']);
+        Route::post('/admin/users', [AdminUserController::class, 'store']);
+        Route::patch('/admin/users/{id}/statut', [AdminUserController::class, 'updateStatut']);
+        
+        Route::get('/admin/audits', [\App\Http\Controllers\AuditController::class, 'index']);
+        Route::get('/admin/configurations', [\App\Http\Controllers\ConfigurationController::class, 'index']);
+        Route::put('/admin/configurations/{cle}', [\App\Http\Controllers\ConfigurationController::class, 'update']);
+    });
 
     // ── Routes Utilisateurs ────────────────────────────────────────────────────
     Route::get('/utilisateurs', [\App\Http\Controllers\UtilisateurController::class, 'index']);
 
     // ── Routes Dashboard & Configurations ──────────────────────────────────────
     Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class, 'stats']);
-    Route::get('/admin/configurations', [\App\Http\Controllers\ConfigurationController::class, 'index']);
-    Route::put('/admin/configurations/{cle}', [\App\Http\Controllers\ConfigurationController::class, 'update']);
 
     // ── Routes Projets ─────────────────────────────────────────────────────────
     Route::get('/projets', [\App\Http\Controllers\ProjetController::class, 'index']);
+    Route::post('/projets/initier', [\App\Http\Controllers\ProjetController::class, 'initier']);
+    Route::post('/projets/{id}/transmettre-chef', [\App\Http\Controllers\ProjetController::class, 'transmettreChef']);
     Route::post('/projets', [\App\Http\Controllers\ProjetController::class, 'store']);
     Route::get('/projets/{id}', [\App\Http\Controllers\ProjetController::class, 'show']);
     Route::put('/projets/{id}', [\App\Http\Controllers\ProjetController::class, 'update']);
     Route::patch('/projets/{id}/etat-spse', [\App\Http\Controllers\ProjetController::class, 'updateEtatSpse']);
     Route::post('/projets/{id}/transmettre', [\App\Http\Controllers\ProjetController::class, 'transmettre']);
+    Route::patch('/projets/{id}/archiver', [\App\Http\Controllers\ProjetController::class, 'archiver']);
 
     // ── Module 2 : Gestion des Équipes ─────────────────────────────────────────
     // Lister les utilisateurs disponibles (non encore membres) — pour les selects du front
@@ -120,9 +127,13 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     Route::put('/activites/{id}', [\App\Http\Controllers\ActiviteController::class, 'update']);
     Route::delete('/activites/{id}', [\App\Http\Controllers\ActiviteController::class, 'destroy']);
 
-    // ── Routes Budget & Dépenses ───────────────────────────────────────────────
+    // ── Routes Budget & Dépenses ───────────────────────────────────────────────    // Budget
     Route::get('/projets/{id}/budget', [\App\Http\Controllers\BudgetController::class, 'show']);
     Route::post('/projets/{id}/budget', [\App\Http\Controllers\BudgetController::class, 'storeOrUpdate']);
+
+    // Rapports
+    Route::get('/projets/{id}/rapports', [\App\Http\Controllers\RapportController::class, 'index']);
+    Route::post('/projets/{id}/rapports', [\App\Http\Controllers\RapportController::class, 'store']);
     Route::post('/budgets/{id}/depenses', [\App\Http\Controllers\DepenseController::class, 'store']);
     Route::patch('/depenses/{id}/valider', [\App\Http\Controllers\DepenseController::class, 'valider']);
 
@@ -137,9 +148,17 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     Route::patch('/taches/{id}/statut', [\App\Http\Controllers\TacheController::class, 'updateStatut']);
     Route::post('/taches/{id}/raci', [\App\Http\Controllers\TacheController::class, 'assignRaci']);
 
+    // Commentaires Privés (Responsable / Approbateur)
+    Route::get('/taches/{id}/commentaires', [\App\Http\Controllers\TacheCommentaireController::class, 'index']);
+    Route::post('/taches/{id}/commentaires', [\App\Http\Controllers\TacheCommentaireController::class, 'store']);
+
     // ── Routes Réunions et Demandes ───────────────────────────────────────────
     Route::get('/reunions/mes-reunions', [\App\Http\Controllers\ReunionController::class, 'index']);
     Route::get('/reunions/demandes', [\App\Http\Controllers\ReunionController::class, 'demandes']);
     Route::post('/reunions', [\App\Http\Controllers\ReunionController::class, 'store']);
     Route::patch('/reunions/{id}/valider', [\App\Http\Controllers\ReunionController::class, 'valider']);
+
+
+    // ── Calendrier Global ─────────────────────────────────────────────────────
+    Route::get('/calendrier', [\App\Http\Controllers\CalendrierController::class, 'index']);
 });

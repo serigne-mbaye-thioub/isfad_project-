@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../axios';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
@@ -8,7 +9,6 @@ import {
     Users, FolderKanban, AlertTriangle, TrendingUp, Wallet, Clock, Activity, Target,
     Folder, CheckSquare, Settings, Phone, BellRing, User, AlertCircle
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 const COLORS = ['#0564A8', '#00ACEF', '#10b981', '#f59e0b', '#ef4444', '#64748b'];
 
@@ -28,7 +28,7 @@ const Dashboard = () => {
                 // If not an Admin, we also fetch the projects list to display at the bottom
                 if (!['Administrateur', 'Administrateur système'].includes(currentUser.fonction)) {
                     const resProjets = await api.get('/api/projets');
-                    setProjets(resProjets.data);
+                    setProjets(Array.isArray(resProjets.data) ? resProjets.data : (resProjets.data.data || []));
                 }
             } catch (error) {
                 console.error("Erreur lors de la récupération des stats", error);
@@ -204,48 +204,48 @@ const Dashboard = () => {
 
             {/* LIGNE 1 : KPIs */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div className="bg-white rounded-2xl p-5 border-l-4 border-[#0564A8] border-y border-r border-gray-100 shadow-sm flex items-center justify-between">
+                <Link to="/projets" className="bg-white rounded-2xl p-5 border-l-4 border-[#0564A8] border-y border-r border-gray-100 shadow-sm flex items-center justify-between hover:scale-105 hover:shadow-md transition cursor-pointer">
                     <div>
                         <h3 className="text-3xl font-black text-[#0564A8] leading-none mb-1">{stats.kpis?.projets_geres}</h3>
                         <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Projets gérés</p>
                     </div>
                     <Folder size={28} className="text-[#0564A8] opacity-80" />
-                </div>
-                <div className="bg-white rounded-2xl p-5 border-l-4 border-emerald-500 border-y border-r border-gray-100 shadow-sm flex items-center justify-between">
+                </Link>
+                <Link to="/projets" className="bg-white rounded-2xl p-5 border-l-4 border-emerald-500 border-y border-r border-gray-100 shadow-sm flex items-center justify-between hover:scale-105 hover:shadow-md transition cursor-pointer">
                     <div>
                         <h3 className="text-3xl font-black text-emerald-600 leading-none mb-1">{stats.kpis?.total_taches}</h3>
                         <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total des tâches</p>
                     </div>
                     <CheckSquare size={28} className="text-emerald-500 opacity-80" />
-                </div>
-                <div className="bg-white rounded-2xl p-5 border-l-4 border-orange-400 border-y border-r border-gray-100 shadow-sm flex items-center justify-between">
+                </Link>
+                <Link to="/projets" className="bg-white rounded-2xl p-5 border-l-4 border-orange-400 border-y border-r border-gray-100 shadow-sm flex items-center justify-between hover:scale-105 hover:shadow-md transition cursor-pointer">
                     <div>
                         <h3 className="text-3xl font-black text-orange-500 leading-none mb-1">{stats.kpis?.taches_en_cours}</h3>
                         <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Tâches en cours</p>
                     </div>
                     <Settings size={28} className="text-orange-400 opacity-80" />
-                </div>
-                <div className="bg-white rounded-2xl p-5 border-l-4 border-red-500 border-y border-r border-gray-100 shadow-sm flex items-center justify-between">
+                </Link>
+                <Link to="/projets" className="bg-white rounded-2xl p-5 border-l-4 border-red-500 border-y border-r border-gray-100 shadow-sm flex items-center justify-between hover:scale-105 hover:shadow-md transition cursor-pointer">
                     <div>
                         <h3 className="text-3xl font-black text-red-500 leading-none mb-1">{stats.kpis?.taches_en_retard}</h3>
                         <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Tâches en retard</p>
                     </div>
                     <AlertTriangle size={28} className="text-red-500 opacity-80" />
-                </div>
-                <div className="bg-white rounded-2xl p-5 border-l-4 border-purple-500 border-y border-r border-gray-100 shadow-sm flex items-center justify-between">
+                </Link>
+                <Link to="/reunions" className="bg-white rounded-2xl p-5 border-l-4 border-purple-500 border-y border-r border-gray-100 shadow-sm flex items-center justify-between hover:scale-105 hover:shadow-md transition cursor-pointer">
                     <div>
                         <h3 className="text-3xl font-black text-purple-600 leading-none mb-1">{stats.kpis?.reunions_a_venir}</h3>
                         <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Réunions à venir</p>
                     </div>
                     <Phone size={28} className="text-purple-500 opacity-80" />
-                </div>
-                <div className="bg-white rounded-2xl p-5 border-l-4 border-rose-500 border-y border-r border-gray-100 shadow-sm flex items-center justify-between">
+                </Link>
+                <Link to="/projets" className="bg-white rounded-2xl p-5 border-l-4 border-rose-500 border-y border-r border-gray-100 shadow-sm flex items-center justify-between hover:scale-105 hover:shadow-md transition cursor-pointer">
                     <div>
                         <h3 className="text-3xl font-black text-rose-500 leading-none mb-1">{stats.kpis?.projets_a_risque}</h3>
                         <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Projets à risque</p>
                     </div>
                     <BellRing size={28} className="text-rose-500 opacity-80" />
-                </div>
+                </Link>
             </div>
 
             {/* LIGNE 2 : Avancement + Actions */}
@@ -282,7 +282,14 @@ const Dashboard = () => {
                             <div key={tache.id} className="bg-red-50/30 border border-red-50 rounded-xl p-3 flex gap-3">
                                 <div className="w-2 h-2 rounded-full bg-red-500 mt-1.5 flex-shrink-0"></div>
                                 <div>
-                                    <p className="text-[13px] font-bold text-gray-800 leading-tight mb-1">{tache.titre}</p>
+                                    <p className="text-[13px] font-bold text-gray-800 leading-tight mb-0.5">{tache.titre}</p>
+                                    {(tache.activite || tache.phase_titre) && (
+                                        <p className="text-[10px] text-gray-400 mb-1 leading-tight">
+                                            {tache.activite?.phase?.titre || tache.phase_titre || 'Sans phase'} 
+                                            <span className="mx-1 text-gray-300">›</span> 
+                                            {tache.activite?.titre || tache.activite_titre || 'Générale'}
+                                        </p>
+                                    )}
                                     <div className="flex items-center gap-3 text-[11px] text-gray-500 font-medium">
                                         <span className="flex items-center gap-1"><User size={12}/> {tache.responsable?.prenom} {tache.responsable?.nom}</span>
                                         <span className="flex items-center gap-1"><Clock size={12}/> {tache.date_limite}</span>

@@ -53,7 +53,7 @@ const ModalAjoutMembre = ({ projetId, onClose, onSuccess }) => {
 
     useEffect(() => {
         api.get(`/api/utilisateurs/disponibles?projet_id=${projetId}`)
-            .then(res => setDisponibles(res.data))
+            .then(res => setDisponibles(Array.isArray(res.data) ? res.data : (res.data.data || [])))
             .catch(() => setError('Impossible de charger les utilisateurs disponibles.'))
             .finally(() => setLoading(false));
     }, [projetId]);

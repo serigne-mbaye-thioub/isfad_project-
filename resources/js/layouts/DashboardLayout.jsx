@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, FolderKanban, Calendar, Bell, LogOut, ChevronDown, Shield, FileText, Wallet } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Users, FolderKanban, Calendar, Bell, LogOut, ChevronDown, Shield, FileText, Wallet, Inbox, Video, Sparkles, Settings, User, HelpCircle, ChevronRight } from 'lucide-react';
 import api from '../axios';
 
 const DashboardLayout = () => {
@@ -25,12 +25,27 @@ const DashboardLayout = () => {
 
     const [notifications, setNotifications] = useState([]);
     const [showNotifs, setShowNotifs] = useState(false);
+    
+    // État pour le menu de profil
+    const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+    const profileMenuRef = useRef(null);
+
+    // Clic en dehors pour fermer le menu profil
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+                setIsProfileMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     useEffect(() => {
         const fetchNotifs = async () => {
             try {
                 const res = await api.get('/api/notifications');
-                setNotifications(res.data);
+                setNotifications(Array.isArray(res.data) ? res.data : (res.data.data || []));
             } catch (e) { console.error(e); }
         };
         fetchNotifs();
@@ -70,12 +85,11 @@ const DashboardLayout = () => {
 
     const navItems = [
         { to: '/dashboard', icon: <LayoutDashboard size={17} />, label: 'Tableau de bord' },
-        ...(!['Administrateur', 'Administrateur système'].includes(user.fonction) 
-            ? [
-                { to: '/projets', icon: <FolderKanban size={17} />, label: 'Projets' },
-                { to: '/reunions', icon: <Calendar size={17} />, label: 'Réunions' }
-              ] 
-            : []),
+        { to: '/projets', icon: <FolderKanban size={17} />, label: 'Projets' },
+        { to: '/reunions', icon: <Video size={17} />, label: 'Réunions' },
+        { to: '/demandes', icon: <Inbox size={17} />, label: 'Demandes' },
+        { to: '/calendrier', icon: <Calendar size={17} />, label: 'Calendrier' },
+        { to: '/notifications', icon: <Bell size={17} />, label: 'Notifications' }
     ];
 
 
@@ -87,16 +101,10 @@ const DashboardLayout = () => {
             <aside className="w-60 bg-[#071525] text-white flex flex-col shadow-2xl z-30 flex-shrink-0">
 
                 {/* Logo */}
-                <div className="px-5 py-6 border-b border-white/5">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-[#0564A8] rounded-lg flex items-center justify-center font-black text-xs shadow-md">
-                            ISFAD
-                        </div>
-                        <div>
-                            <p className="text-[13px] font-extrabold text-white tracking-wide leading-tight">Gouvernance</p>
-                            <p className="text-[10px] text-blue-400 tracking-widest uppercase">UCAD · DAKAR</p>
-                        </div>
-                    </div>
+                <div className="px-4 py-5 border-b border-white/5 flex justify-center">
+                    <Link to="/dashboard" className="bg-white rounded-xl p-2 shadow-lg inline-block hover:scale-105 transition-transform cursor-pointer">
+                        <img src="/images/logo_isfad.png" alt="Logo ISFAD UCAD" className="h-12 w-auto object-contain" />
+                    </Link>
                 </div>
 
                 {/* Navigation principale */}
@@ -116,25 +124,13 @@ const DashboardLayout = () => {
                         >
                             {item.icon}
                             <span>{item.label}</span>
+                            {item.to === '/notifications' && unreadCount > 0 && (
+                                <span className="ml-auto bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">
+                                    {unreadCount}
+                                </span>
+                            )}
                         </NavLink>
                     ))}
-
-                    {/* Modules Bientôt Disponibles */}
-                    <div className="pt-2">
-                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest px-3 mb-3 mt-4">Modules Additionnels</p>
-                        
-                        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-500/50 cursor-not-allowed" title="Bientôt disponible">
-                            <Wallet size={17} />
-                            <span>Budget</span>
-                            <span className="ml-auto text-[8px] uppercase font-black bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded">Bientôt</span>
-                        </div>
-
-                        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-500/50 cursor-not-allowed" title="Bientôt disponible">
-                            <FileText size={17} />
-                            <span>Demandes de chgt.</span>
-                            <span className="ml-auto text-[8px] uppercase font-black bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded">Bientôt</span>
-                        </div>
-                    </div>
 
                     {/* Section Administration (Restreinte) */}
                     {['Administrateur', 'Administrateur système'].includes(user.fonction) && (
@@ -169,18 +165,81 @@ const DashboardLayout = () => {
                 </nav>
 
                 {/* Profil en bas */}
-                <div className="px-3 py-4 border-t border-white/5">
-                    <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition group">
-                        <div className="w-8 h-8 rounded-full bg-[#00ACEF] flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-                            {initials}
+                <div className="px-3 py-4 border-t border-white/5 relative" ref={profileMenuRef}>
+                    
+                    {/* Menu Popup Flottant */}
+                    {isProfileMenuOpen && (
+                        <div className="absolute bottom-full mb-2 left-3 right-3 bg-[#071525] border border-white/10 rounded-2xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                            
+                            {/* En-tête profil dans le menu */}
+                            <Link to="/profil" onClick={() => setIsProfileMenuOpen(false)} className="flex items-center justify-between p-4 hover:bg-white/5 transition border-b border-white/5 group">
+                                <div className="flex items-center gap-3">
+                                    {user?.photo_profil_url ? (
+                                        <img src={user.photo_profil_url} alt="Profil" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                                    ) : (
+                                        <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
+                                            {initials}
+                                        </div>
+                                    )}
+                                    <div>
+                                        <p className="text-sm font-bold text-white">{user.prenom} {user.nom}</p>
+                                        <p className="text-xs text-gray-400">{user.fonction}</p>
+                                    </div>
+                                </div>
+                                <ChevronRight size={16} className="text-gray-500 group-hover:text-white transition" />
+                            </Link>
+
+                            {/* Liens */}
+                            <div className="p-2 space-y-1">
+                                <Link to="/personnalisation" onClick={() => setIsProfileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 transition">
+                                    <Sparkles size={18} className="text-gray-400" /> Personnalisation
+                                </Link>
+                                <Link to="/profil" onClick={() => setIsProfileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 transition">
+                                    <User size={18} className="text-gray-400" /> Profil
+                                </Link>
+                                <Link to="/parametres" onClick={() => setIsProfileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 transition">
+                                    <Settings size={18} className="text-gray-400" /> Paramètres
+                                </Link>
+                            </div>
+
+                            <div className="h-px bg-white/5 my-1 mx-2"></div>
+
+                            {/* Liens bas */}
+                            <div className="p-2 space-y-1">
+                                <Link to="/aide" onClick={() => setIsProfileMenuOpen(false)} className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 transition group">
+                                    <div className="flex items-center gap-3">
+                                        <HelpCircle size={18} className="text-gray-400" /> Aide
+                                    </div>
+                                    <ChevronRight size={14} className="text-gray-500 group-hover:text-white transition" />
+                                </Link>
+                                <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-300 hover:text-red-400 hover:bg-red-400/10 transition text-left">
+                                    <LogOut size={18} className="text-gray-400" /> Se déconnecter
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-white truncate">{user.prenom} {user.nom}</p>
-                            <p className="text-[10px] text-gray-400 truncate">{user.fonction}</p>
+                    )}
+
+                    {/* Trigger du menu */}
+                    <div 
+                        onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                        className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition ${isProfileMenuOpen ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                    >
+                        <div className="flex items-center gap-3">
+                            {user?.photo_profil_url ? (
+                                <img src={user.photo_profil_url} alt="Profil" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                            ) : (
+                                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+                                    {initials}
+                                </div>
+                            )}
+                            <div className="flex-1 min-w-0 max-w-[120px]">
+                                <p className="text-xs font-bold text-white truncate">{user.prenom} {user.nom}</p>
+                                <p className="text-[10px] text-gray-400 truncate">{user.fonction}</p>
+                            </div>
                         </div>
-                        <button onClick={handleLogout} title="Se déconnecter" className="text-gray-500 hover:text-red-400 transition">
-                            <LogOut size={15} />
-                        </button>
+                        <div className="bg-white/10 text-white text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap hidden md:block">
+                            ISFAD
+                        </div>
                     </div>
                 </div>
             </aside>
@@ -195,56 +254,27 @@ const DashboardLayout = () => {
                         <span className="text-gray-400 text-sm">ISFAD Gouvernance</span>
                     </div>
                     <div className="flex items-center gap-4">
-                        {/* Cloche de notifications */}
+                        {/* Cloche de notifications (lien vers la page dédiée) */}
                         <div className="relative">
-                            <button onClick={() => setShowNotifs(!showNotifs)} className="relative text-gray-400 hover:text-[#0564A8] transition">
+                            <NavLink to="/notifications" className={({ isActive }) => `relative transition ${isActive ? 'text-[#0564A8]' : 'text-gray-400 hover:text-[#0564A8]'}`}>
                                 <Bell size={20} />
                                 {unreadCount > 0 && (
-                                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#FF3834] text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#FF3834] text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-sm">
                                         {unreadCount > 9 ? '9+' : unreadCount}
                                     </span>
                                 )}
-                            </button>
-                            
-                            {/* Dropdown Notifications */}
-                            {showNotifs && (
-                                <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden flex flex-col max-h-[400px]">
-                                    <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                                        <h3 className="text-xs font-extrabold text-gray-800 uppercase tracking-wider">Notifications</h3>
-                                        {unreadCount > 0 && (
-                                            <button onClick={markAllAsRead} className="text-[10px] font-bold text-[#0564A8] hover:underline">Tout marquer comme lu</button>
-                                        )}
-                                    </div>
-                                    <div className="overflow-y-auto flex-1">
-                                        {notifications.length === 0 ? (
-                                            <div className="p-4 text-center text-xs text-gray-400">Aucune notification</div>
-                                        ) : (
-                                            notifications.map(n => (
-                                                <div 
-                                                    key={n.id} 
-                                                    onClick={() => !n.est_lue && markAsRead(n.id)}
-                                                    className={`p-3 border-b border-gray-50 cursor-pointer transition ${n.est_lue ? 'opacity-60' : 'bg-blue-50/30 hover:bg-blue-50/60'}`}
-                                                >
-                                                    <p className="text-xs font-bold text-gray-900">{n.notification?.titre || 'Notification'}</p>
-                                                    <p className="text-[11px] text-gray-600 mt-0.5 line-clamp-2">{n.notification?.contenu}</p>
-                                                    <p className="text-[9px] text-gray-400 mt-1">{new Date(n.created_at).toLocaleString('fr-FR')}</p>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                </div>
-                            )}
+                            </NavLink>
                         </div>
+                        {/* Fin Cloche */}
                         {/* Avatar */}
                         <div className="flex items-center gap-2 cursor-pointer group">
-                            <div className="w-8 h-8 rounded-full bg-[#0564A8] flex items-center justify-center text-xs font-bold text-white">
-                                {initials}
-                            </div>
-                            <div className="hidden md:block text-right">
-                                <p className="text-xs font-bold text-gray-800 leading-tight">{user.prenom} {user.nom}</p>
-                                <p className="text-[10px] text-gray-400">{user.fonction}</p>
-                            </div>
-                            <ChevronDown size={14} className="text-gray-400 group-hover:text-gray-600 transition" />
+                            {user?.photo_profil_url ? (
+                                <img src={user.photo_profil_url} alt="Profil" className="w-8 h-8 rounded-full object-cover flex-shrink-0 shadow-sm" />
+                            ) : (
+                                <div className="w-8 h-8 rounded-full bg-[#0564A8] flex items-center justify-center text-xs font-bold text-white shadow-sm">
+                                    {initials}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </header>

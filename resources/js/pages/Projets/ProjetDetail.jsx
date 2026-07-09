@@ -3,13 +3,15 @@ import { useParams, Link } from 'react-router-dom';
 import api from '../../axios';
 import { 
     FolderKanban, Users, Calendar, ArrowLeft, 
-    MoreVertical, CheckCircle2, ChevronDown, Plus, LayoutDashboard, Wallet, GitPullRequest
+    MoreVertical, CheckCircle2, ChevronDown, Plus, LayoutDashboard, Wallet, GitPullRequest, Filter, FileText
 } from 'lucide-react';
 import GestionEquipe from '../../components/GestionEquipe';
 import KanbanBoard from '../../components/KanbanBoard';
 import { ModalCreateActivite, ModalCreateTache } from '../../components/FormsPlanification';
+import ModalConfirm from '../../components/ModalConfirm';
 import BudgetProjet from './BudgetProjet';
 import DemandesChangement from './DemandesChangement';
+import RapportsProjet from './RapportsProjet';
 
 const ModalCreatePhase = ({ projetId, onClose, onSuccess }) => {
     const [formData, setFormData] = useState({ nom: '', description: '', date_debut: '', date_fin: '', ordre: 1 });
@@ -65,6 +67,9 @@ const ProjetDetail = () => {
     const [showPhaseModal, setShowPhaseModal] = useState(false);
     const [showActiviteModal, setShowActiviteModal] = useState(false);
     const [showTacheModal, setShowTacheModal] = useState(false);
+    const [filterResponsable, setFilterResponsable] = useState('all');
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const [confirmAction, setConfirmAction] = useState({ isOpen: false });
 
     const fetchProjet = async () => {
         try {
@@ -86,13 +91,31 @@ const ProjetDetail = () => {
     if (loading) return <div className="p-8 text-center text-gray-500 animate-pulse">Chargement du projet...</div>;
     if (!projet) return <div className="p-8 text-center text-red-500">Projet introuvable.</div>;
 
-    // Aplatir toutes les tâches pour le Kanban
     let toutesTaches = [...(projet.taches || [])];
     projet.phases?.forEach(p => {
         p.activites?.forEach(a => {
-            toutesTaches = [...toutesTaches, ...(a.taches || [])];
+            const tachesEnrichies = (a.taches || []).map(t => ({
+                ...t, 
+                phase_titre: p.nom, 
+                activite_titre: a.titre
+            }));
+            toutesTaches = [...toutesTaches, ...tachesEnrichies];
         });
     });
+
+    const tachesFiltrees = toutesTaches.filter(t => {
+        if (filterResponsable === 'all') return true;
+        if (filterResponsable === 'me') return t.id_responsable === currentUser?.id;
+        return t.id_responsable === parseInt(filterResponsable, 10);
+    });
+    const activeFilterText = filterResponsable === 'all' 
+        ? 'Toutes les tâches' 
+        : filterResponsable === 'me' 
+            ? 'Mes tâches'
+            : (projet?.membres?.find(m => m.id == filterResponsable)?.prenom || '') + ' ' + (projet?.membres?.find(m => m.id == filterResponsable)?.nom || '');
+
+    const canFilterTasks = ['Chef de projet', 'Gestionnaire de projet', 'Gestionnaire', 'Administrateur', 'Administrateur système'].includes(currentUser?.fonction);
+    const isGlobalManager = ['Gestionnaire de projet', 'Gestionnaire', 'Administrateur', 'Administrateur système'].includes(currentUser?.fonction);
 
     return (
         <div className="max-w-7xl mx-auto h-full flex flex-col">
@@ -118,13 +141,17 @@ const ProjetDetail = () => {
                         {!projet.transmis_gestionnaire && currentUser?.fonction === 'Chef de projet' && (
                             <div className="mt-4">
                                 <button 
-                                    onClick={() => {
-                                        if(window.confirm('Voulez-vous transmettre ce projet au gestionnaire ?')) {
+                                    onClick={() => setConfirmAction({
+                                        isOpen: true,
+                                        title: 'Transmettre au gestionnaire',
+                                        message: 'Êtes-vous sûr de vouloir transmettre ce projet au gestionnaire ? Une fois transmis, il pourra être validé et démarrer.',
+                                        type: 'primary',
+                                        onConfirm: () => {
                                             api.post(`/api/projets/${projet.id}/transmettre`)
                                                .then(() => window.location.reload())
                                                .catch(e => alert(e.response?.data?.message || 'Erreur lors de la transmission'));
                                         }
-                                    }}
+                                    })}
                                     className="text-xs bg-blue-50 text-[#0564A8] px-4 py-2 rounded-lg font-bold hover:bg-blue-100 transition border border-blue-200"
                                 >
                                     Transmettre au Gestionnaire
@@ -139,18 +166,46 @@ const ProjetDetail = () => {
                     </div>
 
                     <div className="flex flex-col items-end gap-3 w-full md:w-auto">
-                        {currentUser?.fonction === 'Superviseur' && projet.statut !== 'annule' && (
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Statut</span>
+                            <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-extrabold capitalize border border-emerald-100">
+                                {projet.statut.replace(/_/g, ' ')}
+                            </span>
+                        </div>
+                        {projet.statut !== 'annule' && currentUser?.fonction === 'Chef de projet' && (
                             <button 
-                                onClick={() => {
-                                    if(window.confirm('Voulez-vous vraiment annuler ce projet ?')) {
-                                        api.put(`/api/projets/${projet.id}`, { statut: 'annule' })
-                                           .then(() => window.location.reload())
-                                           .catch(e => alert('Erreur lors de l\'annulation'));
+                                onClick={() => setConfirmAction({
+                                    isOpen: true,
+                                    title: 'Annuler le projet',
+                                    message: 'Êtes-vous sûr de vouloir annuler ce projet ? Cette action modifiera son statut en "Annulé".',
+                                    type: 'danger',
+                                    onConfirm: async () => {
+                                        await api.put(`/api/projets/${projet.id}`, { statut: 'annule' });
+                                        fetchProjet();
                                     }
-                                }}
+                                })}
                                 className="text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-lg font-bold hover:bg-red-100 transition"
                             >
                                 Annuler le projet
+                            </button>
+                        )}
+                        {isGlobalManager && projet.statut !== 'a_demarrer' && projet.statut !== 'initie' && (
+                            <button 
+                                onClick={() => setConfirmAction({
+                                    isOpen: true,
+                                    title: projet.statut === 'archive' ? 'Désarchiver le projet' : 'Archiver le projet',
+                                    message: projet.statut === 'archive' 
+                                        ? 'Êtes-vous sûr de vouloir désarchiver ce projet ? Il redeviendra visible pour les autres membres.' 
+                                        : 'Êtes-vous sûr de vouloir archiver ce projet ? Seul le Gestionnaire y aura accès.',
+                                    type: projet.statut === 'archive' ? 'primary' : 'danger',
+                                    onConfirm: async () => {
+                                        await api.patch(`/api/projets/${projet.id}/archiver`);
+                                        fetchProjet();
+                                    }
+                                })}
+                                className={`text-xs px-3 py-1.5 rounded-lg font-bold transition ${projet.statut === 'archive' ? 'bg-blue-50 text-[#0564A8] hover:bg-blue-100' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                            >
+                                {projet.statut === 'archive' ? 'Désarchiver le projet' : 'Archiver le projet'}
                             </button>
                         )}
                         <div className="flex items-center gap-2">
@@ -195,6 +250,12 @@ const ProjetDetail = () => {
                 >
                     <GitPullRequest size={16} /> Demandes de Changement
                 </button>
+                <button 
+                    onClick={() => setActiveTab('rapports')}
+                    className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${activeTab === 'rapports' ? 'border-[#0564A8] text-[#0564A8]' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
+                >
+                    <FileText size={16} /> Rapports
+                </button>
             </div>
 
             {/* Contenu de l'onglet */}
@@ -232,10 +293,69 @@ const ProjetDetail = () => {
                     <div className="overflow-y-auto h-full">
                         <DemandesChangement projetId={projet.id} currentUser={currentUser} />
                     </div>
+                ) : activeTab === 'rapports' ? (
+                    <div className="overflow-y-auto h-full">
+                        <RapportsProjet projetId={projet.id} currentUser={currentUser} />
+                    </div>
                 ) : (
                     <div className="flex flex-col h-full overflow-hidden">
                         <div className="flex justify-between items-center mb-4 flex-shrink-0">
-                            <h2 className="text-lg font-extrabold text-gray-900">Tableau de bord des tâches</h2>
+                            <div className="flex items-center gap-4">
+                                <h2 className="text-lg font-extrabold text-gray-900">Tableau de bord des tâches</h2>
+                                {canFilterTasks && (
+                                    <div className="relative">
+                                        <button 
+                                            onClick={() => setIsFilterOpen(!isFilterOpen)}
+                                            className="flex items-center gap-2 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm"
+                                        >
+                                            <Filter size={14} className="text-[#0564A8]" />
+                                            <span className="truncate max-w-[150px]">{activeFilterText}</span>
+                                            <ChevronDown size={14} className={`text-gray-400 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+                                        
+                                        {isFilterOpen && (
+                                            <>
+                                                <div className="fixed inset-0 z-40" onClick={() => setIsFilterOpen(false)}></div>
+                                                <div className="absolute top-full left-0 mt-1.5 w-60 bg-white border border-gray-100 rounded-xl shadow-xl z-50 py-2">
+                                                    <div className="px-4 pb-2 mb-2 border-b border-gray-50">
+                                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Filtres rapides</p>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => {setFilterResponsable('all'); setIsFilterOpen(false);}} 
+                                                        className={`w-full text-left px-4 py-2 text-sm font-semibold transition-colors flex items-center justify-between ${filterResponsable === 'all' ? 'text-[#0564A8] bg-blue-50/50' : 'text-gray-700 hover:bg-gray-50'}`}
+                                                    >
+                                                        Toutes les tâches
+                                                        {filterResponsable === 'all' && <div className="w-1.5 h-1.5 rounded-full bg-[#0564A8]"></div>}
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => {setFilterResponsable('me'); setIsFilterOpen(false);}} 
+                                                        className={`w-full text-left px-4 py-2 text-sm font-semibold transition-colors flex items-center justify-between ${filterResponsable === 'me' ? 'text-[#0564A8] bg-blue-50/50' : 'text-gray-700 hover:bg-gray-50'}`}
+                                                    >
+                                                        Mes tâches
+                                                        {filterResponsable === 'me' && <div className="w-1.5 h-1.5 rounded-full bg-[#0564A8]"></div>}
+                                                    </button>
+                                                    
+                                                    <div className="px-4 pt-3 pb-2 mt-2 border-t border-gray-50 mb-1">
+                                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Par membre</p>
+                                                    </div>
+                                                    <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                                                        {projet.membres?.filter(m => m.id !== currentUser?.id).map(m => (
+                                                            <button 
+                                                                key={m.id}
+                                                                onClick={() => {setFilterResponsable(m.id.toString()); setIsFilterOpen(false);}} 
+                                                                className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center justify-between ${filterResponsable === m.id.toString() ? 'text-[#0564A8] bg-blue-50/50 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}
+                                                            >
+                                                                {m.prenom} {m.nom}
+                                                                {filterResponsable === m.id.toString() && <div className="w-1.5 h-1.5 rounded-full bg-[#0564A8]"></div>}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                             <div className="flex gap-2">
                                 <button onClick={() => setShowPhaseModal(true)} className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-gray-200 transition">
                                     <Plus size={14} /> Phase
@@ -252,9 +372,10 @@ const ProjetDetail = () => {
                         {/* Zone Kanban défilable horizontalement */}
                         <div className="flex-1 overflow-hidden flex">
                             <KanbanBoard 
-                                taches={toutesTaches} 
+                                taches={tachesFiltrees} 
                                 onTaskUpdate={fetchProjet} 
                                 currentUser={currentUser} 
+                                membres={projet.membres}
                             />
                         </div>
                     </div>
@@ -270,6 +391,11 @@ const ProjetDetail = () => {
             {showTacheModal && (
                 <ModalCreateTache phases={projet.phases || []} projetId={projet.id} membres={projet.membres || []} onClose={() => setShowTacheModal(false)} onSuccess={() => {setShowTacheModal(false); fetchProjet();}} />
             )}
+
+            <ModalConfirm 
+                {...confirmAction} 
+                onClose={() => setConfirmAction({ ...confirmAction, isOpen: false })} 
+            />
         </div>
     );
 };

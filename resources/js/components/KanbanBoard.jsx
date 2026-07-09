@@ -56,7 +56,14 @@ const KanbanTask = ({ task, onClick, onStatutChange, currentUser }) => {
                 )}
             </div>
 
-            <h4 className="text-sm font-bold text-gray-900 leading-tight mb-3 line-clamp-2">{task.titre}</h4>
+            <h4 className="text-sm font-bold text-gray-900 leading-tight mb-1.5 line-clamp-2">{task.titre}</h4>
+            {(task.phase_titre || task.activite_titre || task.activite?.phase?.titre) && (
+                <div className="text-[10px] text-gray-500 mb-3 leading-tight">
+                    {task.phase_titre || task.activite?.phase?.titre || 'Sans phase'} 
+                    <span className="mx-1 text-gray-300">›</span> 
+                    {task.activite_titre || task.activite?.titre || 'Générale'}
+                </div>
+            )}
 
             <div className="flex items-center justify-between mt-auto">
                 {/* R et A visuels */}
@@ -135,7 +142,7 @@ const KanbanColumn = ({ status, tasks, onTaskClick, onStatutChange, currentUser 
     );
 };
 
-const KanbanBoard = ({ taches = [], onTaskUpdate, currentUser }) => {
+const KanbanBoard = ({ taches = [], onTaskUpdate, currentUser, membres = [] }) => {
     const [selectedTask, setSelectedTask] = useState(null);
 
     const handleStatutChange = async (taskId, newStatut) => {
@@ -166,7 +173,13 @@ const KanbanBoard = ({ taches = [], onTaskUpdate, currentUser }) => {
             </div>
 
             {selectedTask && (
-                <ModalDetailTache task={selectedTask} onClose={() => setSelectedTask(null)} />
+                <ModalDetailTache 
+                    task={selectedTask} 
+                    onClose={() => setSelectedTask(null)} 
+                    currentUser={currentUser}
+                    membres={membres}
+                    onTaskUpdate={() => { onTaskUpdate(); setSelectedTask(null); }}
+                />
             )}
         </>
     );

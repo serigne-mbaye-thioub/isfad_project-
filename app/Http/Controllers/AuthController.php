@@ -124,7 +124,6 @@ class AuthController extends Controller
     public function changePassword(Request $request): JsonResponse
     {
         $request->validate([
-            'mot_de_passe_actuel'  => ['required', 'string'],
             'nouveau_mot_de_passe' => [
                 'required',
                 'confirmed',
@@ -141,13 +140,6 @@ class AuthController extends Controller
 
         /** @var Utilisateur $utilisateur */
         $utilisateur = $request->user();
-
-        // Vérification du mot de passe actuel
-        if (! Hash::check($request->mot_de_passe_actuel, $utilisateur->mot_de_passe)) {
-            return response()->json([
-                'message' => 'Le mot de passe actuel est incorrect.',
-            ], 422);
-        }
 
         // Mise à jour du mot de passe et désactivation du flag premiere_connexion
         $utilisateur->update([
@@ -173,19 +165,23 @@ class AuthController extends Controller
      */
     public function forgotPassword(Request $request)
     {
-        $request->validate(['email' => 'required|email|exists:utilisateurs,email']);
+        $request->validate(['email' => 'required|email']);
         
-        // Code à 6 chiffres
-        $token = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $user = Utilisateur::where('email', $request->email)->first();
         
-        DB::table('password_reset_tokens')->updateOrInsert(
-            ['email' => $request->email],
-            ['token' => $token, 'created_at' => now()]
-        );
+        if ($user) {
+            // Code à 6 chiffres
+            $token = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            
+            DB::table('password_reset_tokens')->updateOrInsert(
+                ['email' => $request->email],
+                ['token' => $token, 'created_at' => now()]
+            );
+            
+            Mail::to($request->email)->send(new ResetPasswordMail($token));
+        }
         
-        Mail::to($request->email)->send(new ResetPasswordMail($token));
-        
-        return response()->json(['message' => 'Un code de sécurité a été envoyé à votre adresse e-mail.']);
+        return response()->json(['message' => 'Si cet email correspond à un compte actif, un code de sécurité vous a été envoyé.']);
     }
 
     /**
@@ -209,8 +205,13 @@ class AuthController extends Controller
         }
 
         $user = Utilisateur::where('email', $request->email)->first();
-        $user->mot_de_passe = bcrypt($request->mot_de_passe);
-        $user->save();
+        if ($user) {
+            $user->mot_de_passe = bcrypt($request->mot_de_passe);
+            $user->save();
+            
+            // Révocation de tous les jetons actifs
+            $user->tokens()->delete();
+        }
 
         DB::table('password_reset_tokens')->where('email', $request->email)->delete();
 
@@ -226,13 +227,85 @@ class AuthController extends Controller
         
         $validated = $request->validate([
             'nom' => 'string|max:100',
-            'prenom' => 'string|max:100',
+            'prenom' => 'required_without_all:nom,telephone|string|max:100',
             'telephone' => 'nullable|string|max:20',
         ]);
+        
+        if (empty($validated)) {
+            return response()->json(['message' => 'Aucune donnée à mettre à jour.'], 400);
+        }
         
         $user->update($validated);
         
         return response()->json(['message' => 'Profil mis à jour avec succès.', 'user' => $user]);
+    }
+
+    /**
+     * Mise à jour du mot de passe depuis le profil
+     */
+    public function updatePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required',
+            'nouveau_mot_de_passe' => [
+                'required',
+                'confirmed',
+                Password::min(8)
+                    ->letters()
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols()
+                    ->when(! app()->environment('testing'), fn ($rule) => $rule->uncompromised()),
+            ],
+        ], [
+            'nouveau_mot_de_passe.confirmed' => 'La confirmation du nouveau mot de passe ne correspond pas.',
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($request->current_password, $user->mot_de_passe)) {
+            return response()->json([
+                'errors' => [
+                    'current_password' => ['Le mot de passe actuel est incorrect.']
+                ]
+            ], 422);
+        }
+
+        $user->mot_de_passe = $request->nouveau_mot_de_passe; // Haché par le mutator/cast
+        $user->save();
+
+        return response()->json(['message' => 'Mot de passe modifié avec succès.']);
+    }
+
+    /**
+     * Mise à jour de la photo de profil
+     */
+    public function updatePhoto(Request $request)
+    {
+        $request->validate([
+            'photo' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+        ]);
+
+        $user = $request->user();
+
+        if ($request->hasFile('photo')) {
+            // Supprimer l'ancienne photo si elle existe
+            if ($user->photo_profil && \Illuminate\Support\Facades\Storage::disk('public')->exists($user->photo_profil)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($user->photo_profil);
+            }
+
+            $path = $request->file('photo')->store('profils', 'public');
+            $user->photo_profil = $path;
+            $user->save();
+
+            return response()->json([
+                'message' => 'Photo de profil mise à jour avec succès.',
+                'photo_url' => $user->photo_profil_url,
+                'user' => $user
+            ]);
+        }
+
+        return response()->json(['message' => 'Aucune photo sélectionnée.'], 400);
     }
 
     // ─── Helpers privés ───────────────────────────────────────────────────────

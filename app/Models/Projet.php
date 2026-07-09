@@ -24,6 +24,8 @@ class Projet extends Model
 
     protected $fillable = [
         'titre',
+        'objectif',
+        'division',
         'description',
         'date_debut',
         'date_fin',

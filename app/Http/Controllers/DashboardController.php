@@ -26,14 +26,19 @@ class DashboardController extends Controller
             return $this->getAdminStats();
         }
 
-        // 2. Vue Globale : Administrateur système, Superviseur, Gestionnaire de projet (qui ont la vision sur tous les projets)
-        if (($user->hasRole('Gestionnaire de projet') || $user->isAdminGlobally()) && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet') {
+        // 2. Vue Globale : Superviseur, Gestionnaire de projet (qui ont la vision sur tous les projets)
+        if ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet') {
             return $this->getSuperviseurStats($user);
         }
 
-        // 3. Vue Chef de projet et Architecte (vision restreinte à leurs propres projets)
-        if ($user->fonction === 'Chef de projet' || $user->fonction === 'Architecte de projet') {
+        // 3. Vue Chef de projet (vision restreinte à ses projets)
+        if ($user->fonction === 'Chef de projet') {
             return $this->getGestionnaireStats($user);
+        }
+
+        // 4. Vue Architecte (vision restreinte aux projets qu'il a initiés)
+        if ($user->fonction === 'Architecte' || $user->fonction === 'Architecte de projet') {
+            return $this->getArchitecteStats($user);
         }
 
         // Autres (Membres) -> Pas de tableau de bord décisionnel complexe par défaut
@@ -62,7 +67,13 @@ class DashboardController extends Controller
 
     private function getSuperviseurStats(Utilisateur $user): JsonResponse
     {
-        $projetsIds = Projet::pluck('id')->toArray();
+        $projetsIds = Projet::where('transmis_gestionnaire', true)
+            ->orWhere('id_createur', $user->id)
+            ->orWhereHas('participations', function($q) use ($user) {
+                $q->where('id_utilisateur', $user->id)->where('statut', 'actif');
+            })
+            ->pluck('id')->toArray();
+            
         return $this->buildDecisionDashboard($user, $projetsIds);
     }
 
@@ -77,13 +88,39 @@ class DashboardController extends Controller
         return $this->buildDecisionDashboard($user, $projetsIds);
     }
 
-    private function buildDecisionDashboard(Utilisateur $user, array $projetsIds): JsonResponse
+    private function getArchitecteStats(Utilisateur $user): JsonResponse
     {
+        // L'architecte ne voit que les projets qu'il a initiés.
+        $projetsIds = Projet::where('id_createur', $user->id)->pluck('id')->toArray();
+        
+        return $this->buildDecisionDashboard($user, $projetsIds, 'Architecte');
+    }
+
+    private function buildDecisionDashboard(Utilisateur $user, array $projetsIds, string $roleVue = 'Gestionnaire'): JsonResponse
+    {
+        // Filtrer pour ne conserver que les projets actifs (non archivés, non annulés)
+        $projetsIds = \App\Models\Projet::whereIn('id', empty($projetsIds) ? [0] : $projetsIds)
+            ->whereNotIn('statut', ['archive', 'annule'])
+            ->pluck('id')->toArray();
+
+        $safeProjetIds = empty($projetsIds) ? [0] : $projetsIds;
+
+        $activitesIds = \App\Models\Activite::whereHas('phase', function($q) use ($safeProjetIds) {
+            $q->whereIn('id_projet', $safeProjetIds);
+        })->pluck('id')->toArray();
+        
+        $safeActivitesIds = empty($activitesIds) ? [0] : $activitesIds;
+
         // KPIs
         $totalProjets = count($projetsIds);
-        $totalTaches = Tache::whereIn('id_projet', $projetsIds)->count();
-        $tachesEnCours = Tache::whereIn('id_projet', $projetsIds)->where('statut', 'en_cours')->count();
-        $tachesEnRetard = Tache::whereIn('id_projet', $projetsIds)->whereIn('statut', ['a_faire', 'en_cours', 'en_revision'])->where('date_limite', '<', now()->startOfDay())->count();
+        
+        $tachesQuery = function($q) use ($safeProjetIds, $safeActivitesIds) {
+            $q->whereIn('id_projet', $safeProjetIds)->orWhereIn('id_activite', $safeActivitesIds);
+        };
+
+        $totalTaches = Tache::where($tachesQuery)->count();
+        $tachesEnCours = Tache::where($tachesQuery)->where('statut', 'en_cours')->count();
+        $tachesEnRetard = Tache::where($tachesQuery)->whereIn('statut', ['a_faire', 'en_cours', 'en_revision'])->where('date_limite', '<', now()->startOfDay())->count();
         
         $reunionsAVenir = \App\Models\Reunion::where('statut', 'planifiee')
             ->where('date_reunion', '>=', now())
@@ -102,35 +139,35 @@ class DashboardController extends Controller
                 }
             })->count();
 
-        $projetsARisque = Projet::whereIn('id', $projetsIds)
+        $projetsARisque = Projet::whereIn('id', empty($projetsIds) ? [0] : $projetsIds)
             ->where(function($q) {
                 $q->where('statut', 'suspendu')
                   ->orWhere('priorite', 'critique');
             })->count();
 
-        // Avancement des 5 projets récents
-        $avancementProjets = Projet::whereIn('id', $projetsIds)
+        // Avancement des projets récents (tous les non-cloturés)
+        $avancementProjets = Projet::whereIn('id', empty($projetsIds) ? [0] : $projetsIds)
             ->whereNotIn('statut', ['cloture', 'archive', 'annule'])
             ->orderBy('updated_at', 'desc')
-            ->limit(5)
             ->get(['id', 'titre', 'avancement']);
 
         // Actions requises
-        $demandesEnAttente = \App\Models\Reunion::where('statut', 'en_attente')
-            ->whereIn('id_projet', empty($projetsIds) ? [0] : $projetsIds)
+        $demandesEnAttente = \App\Models\DemandeChangement::where('statut', 'en_attente')
+            ->where('type_cible', 'projet')
+            ->whereIn('id_cible', empty($projetsIds) ? [0] : $projetsIds)
             ->count();
 
-        $tachesCritiques = Tache::whereIn('id_projet', empty($projetsIds) ? [0] : $projetsIds)
+        $tachesCritiques = Tache::where($tachesQuery)
             ->whereIn('statut', ['a_faire', 'en_cours'])
             ->where('priorite', 'critique')
-            ->with('responsable:id,nom,prenom')
+            ->with(['responsable:id,nom,prenom', 'activite.phase'])
             ->orderBy('date_limite', 'asc')
-            ->limit(3)
-            ->get(['id', 'titre', 'date_limite', 'id_responsable']);
+            ->limit(10)
+            ->get(['id', 'titre', 'date_limite', 'id_responsable', 'id_activite']);
 
         // Tâches terminées par mois (6 derniers mois)
         $sixMonthsAgo = now()->subMonths(5)->startOfMonth();
-        $tachesTerminees = Tache::whereIn('id_projet', empty($projetsIds) ? [0] : $projetsIds)
+        $tachesTerminees = Tache::where($tachesQuery)
             ->where('statut', 'terminee')
             ->whereNotNull('date_cloture')
             ->where('date_cloture', '>=', $sixMonthsAgo)
@@ -156,13 +193,13 @@ class DashboardController extends Controller
         }
 
         // Répartition des tâches par statut
-        $tachesStatuts = Tache::whereIn('id_projet', empty($projetsIds) ? [0] : $projetsIds)
+        $tachesStatuts = Tache::where($tachesQuery)
             ->selectRaw('statut, count(*) as total')
             ->groupBy('statut')
             ->get();
 
         return response()->json([
-            'role_vue' => 'Gestionnaire',
+            'role_vue' => $roleVue,
             'kpis' => [
                 'projets_geres' => $totalProjets,
                 'total_taches' => $totalTaches,

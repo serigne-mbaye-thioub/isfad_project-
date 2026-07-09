@@ -4,6 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Projet;
 use App\Models\ParticipationProjet;
+use App\Models\Reunion;
+use App\Models\ParticipationReunion;
+use App\Models\Notification;
+use App\Models\NotificationDestinataire;
 use Illuminate\Http\Request;
 
 class ProjetController extends Controller
@@ -15,28 +19,29 @@ class ProjetController extends Controller
     {
         $user = $request->user();
         
-        // Le Superviseur et Gestionnaire voient TOUS les projets TRANSMIS (ou dont ils sont créateurs/membres)
-        // Mais ATTENTION: 'Chef de projet' hérite de 'Gestionnaire' dans Utilisateur.php, 
-        // donc on doit exclure explicitement le 'Chef de projet' (et l'Architecte) de la vision globale.
-        if (($user->hasRole('Gestionnaire de projet') || $user->isAdminGlobally()) && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet') {
-            $projets = Projet::where('transmis_gestionnaire', true)
-                ->orWhere('id_createur', $user->id)
-                ->orWhereHas('participations', function($q) use ($user) {
-                    $q->where('id_utilisateur', $user->id)->where('statut', 'actif');
-                })
-                ->with(['createur', 'membres'])
-                ->get();
+        $hasGlobalAccess = ($user->hasRole('Gestionnaire de projet') || $user->isAdminGlobally()) && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet';
+        
+        $query = Projet::with(['createur', 'membres']);
+
+        if ($hasGlobalAccess) {
+            $query->where(function($q) use ($user) {
+                $q->where('transmis_gestionnaire', true)
+                  ->orWhere('id_createur', $user->id)
+                  ->orWhereHas('participations', function($sq) use ($user) {
+                      $sq->where('id_utilisateur', $user->id)->where('statut', 'actif');
+                  });
+            });
+        } elseif ($user->fonction === 'Architecte' || $user->fonction === 'Architecte de projet') {
+            $query->where('id_createur', $user->id)->where('statut', '!=', 'archive');
         } else {
-            // Tous les autres (y compris Chef de projet et Architecte) ne voient que leurs projets
-            $projets = Projet::where(function($query) use ($user) {
-                $query->whereHas('participations', function($q) use ($user) {
-                    $q->where('id_utilisateur', $user->id)
-                      ->where('statut', 'actif');
+            $query->where(function($q) use ($user) {
+                $q->whereHas('participations', function($sq) use ($user) {
+                    $sq->where('id_utilisateur', $user->id)->where('statut', 'actif');
                 })->orWhere('id_createur', $user->id);
-            })
-            ->with(['createur', 'membres'])
-            ->get();
+            })->where('statut', '!=', 'archive');
         }
+
+        $projets = $query->get();
 
         return response()->json($projets);
     }
@@ -47,20 +52,29 @@ class ProjetController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        // Seul l'Architecte peut créer
-        if ($user->fonction !== 'Architecte de projet' && $user->fonction !== 'Architecte') {
-            return response()->json(['message' => 'Seul l\'Architecte de projet peut initialiser un projet.'], 403);
+        $allowedRoles = ['Architecte', 'Architecte de projet', 'Gestionnaire', 'Gestionnaire de projet', 'Chef de projet', 'Administrateur', 'Administrateur système'];
+        
+        if (!in_array($user->fonction, $allowedRoles)) {
+            return response()->json(['message' => 'Vous n\'avez pas les droits pour initialiser un projet.'], 403);
         }
 
         $validated = $request->validate([
-            'titre' => 'required|string|max:200',
+            'titre' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'fiche_projet' => 'nullable|string',
+            'fiche_projet' => 'nullable|url',
             'fichier' => 'nullable|file|mimes:pdf,doc,docx|max:10240', // 10MB max
             'date_debut' => 'required|date',
             'date_fin' => 'required|date|after_or_equal:date_debut',
             'priorite' => 'nullable|in:basse,moyenne,haute,critique',
             'id_chef_projet' => 'required|exists:utilisateurs,id',
+            'create_kickoff' => 'nullable|boolean',
+            'reunion_date' => 'nullable|required_if:create_kickoff,true|date',
+            'reunion_heure' => 'nullable|required_if:create_kickoff,true|date_format:H:i',
+            'reunion_lieu' => 'nullable|string|max:255',
+            'reunion_duree' => 'nullable|integer|min:15',
+            'id_projet_initial' => 'nullable|exists:projets,id',
+            'participants_reunion' => 'nullable|array',
+            'participants_reunion.*' => 'exists:utilisateurs,id',
         ]);
 
         $path = null;
@@ -68,21 +82,181 @@ class ProjetController extends Controller
             $path = $request->file('fichier')->store('fiches_projets', 'public');
         }
 
-        $projet = Projet::create([
-            'titre' => $validated['titre'],
-            'description' => $validated['description'] ?? null,
-            'fiche_projet' => $validated['fiche_projet'] ?? null,
-            'fiche_fichier' => $path,
-            'date_debut' => $validated['date_debut'],
-            'date_fin' => $validated['date_fin'],
-            'priorite' => $validated['priorite'] ?? 'moyenne',
-            'statut' => 'a_demarrer',
-            'avancement' => 0,
-            'id_createur' => $user->id,
-            'transmis_gestionnaire' => false,
+        if (!empty($validated['id_projet_initial'])) {
+            $projet = Projet::findOrFail($validated['id_projet_initial']);
+            $projet->update([
+                'titre' => $validated['titre'],
+                'description' => $validated['description'] ?? null,
+                'fiche_projet' => $validated['fiche_projet'] ?? null,
+                'date_debut' => $validated['date_debut'],
+                'date_fin' => $validated['date_fin'],
+                'priorite' => $validated['priorite'] ?? 'moyenne',
+                'statut' => 'a_demarrer',
+            ]);
+            if ($path) {
+                $projet->update(['fiche_fichier' => $path]);
+            }
+        } else {
+            $projet = Projet::create([
+                'titre' => $validated['titre'],
+                'description' => $validated['description'] ?? null,
+                'fiche_projet' => $validated['fiche_projet'] ?? null,
+                'fiche_fichier' => $path,
+                'date_debut' => $validated['date_debut'],
+                'date_fin' => $validated['date_fin'],
+                'priorite' => $validated['priorite'] ?? 'moyenne',
+                'statut' => 'a_demarrer',
+                'avancement' => 0,
+                'id_createur' => $user->id,
+                'transmis_gestionnaire' => false,
+            ]);
+        }
+
+        // Déterminer le rôle du créateur dans le projet
+        $roleCreateur = null;
+        if (in_array($user->fonction, ['Architecte', 'Architecte de projet', 'Administrateur', 'Administrateur système'])) {
+            $roleCreateur = 'architecte';
+        } elseif (in_array($user->fonction, ['Gestionnaire', 'Gestionnaire de projet'])) {
+            $roleCreateur = 'gestionnaire';
+        } elseif ($user->fonction === 'Chef de projet') {
+            $roleCreateur = 'chef_projet';
+        }
+
+        // Eviter le doublon si le créateur se désigne lui-même comme chef de projet principal
+        $isCreatorAlsoDesignatedChef = ($user->id == $validated['id_chef_projet']);
+
+        if (!$isCreatorAlsoDesignatedChef && $roleCreateur) {
+            ParticipationProjet::create([
+                'id_projet' => $projet->id,
+                'id_utilisateur' => $user->id,
+                'role_projet' => $roleCreateur,
+                'statut' => 'actif',
+                'date_affectation' => now(),
+            ]);
+        }
+
+        // Le Chef de projet désigné est ajouté (ou mis à jour s'il existe déjà via la transmission)
+        ParticipationProjet::updateOrCreate(
+            ['id_projet' => $projet->id, 'id_utilisateur' => $validated['id_chef_projet']],
+            ['role_projet' => 'chef_projet', 'statut' => 'actif', 'date_affectation' => now()]
+        );
+
+        // --- GESTION DE LA RÉUNION DE DÉMARRAGE ---
+        if (!empty($validated['create_kickoff']) && $validated['create_kickoff']) {
+            $dateHeureReunion = $validated['reunion_date'] . ' ' . $validated['reunion_heure'] . ':00';
+            
+            $reunion = Reunion::create([
+                'id_projet' => $projet->id,
+                'titre' => 'Réunion de démarrage : ' . $projet->titre,
+                'ordre_du_jour' => "Présentation du projet, des objectifs et de l'équipe.",
+                'lieu' => $validated['reunion_lieu'] ?? 'À définir',
+                'date_reunion' => $dateHeureReunion,
+                'duree_minutes' => $validated['reunion_duree'] ?? 60,
+                'statut' => 'planifiee',
+                'id_organisateur' => $user->id,
+            ]);
+
+            // Ajout des participants à la réunion
+            ParticipationReunion::create([
+                'id_reunion' => $reunion->id,
+                'id_utilisateur' => $user->id,
+                'statut_presence' => 'accepte', // L'organisateur accepte par défaut
+            ]);
+
+            if (!$isCreatorAlsoDesignatedChef) {
+                ParticipationReunion::create([
+                    'id_reunion' => $reunion->id,
+                    'id_utilisateur' => $validated['id_chef_projet'],
+                    'statut_presence' => 'en_attente',
+                ]);
+
+                // Notification pour le Chef de projet
+                $notif = Notification::create([
+                    'type_evenement' => 'reunion',
+                    'titre' => 'Invitation à la réunion de démarrage',
+                    'contenu' => "Vous êtes convié à la réunion de démarrage du projet '{$projet->titre}'.",
+                    'type_cible' => 'reunion',
+                    'id_cible' => $reunion->id,
+                    'id_emetteur' => $user->id,
+                ]);
+
+                NotificationDestinataire::create([
+                    'id_notification' => $notif->id,
+                    'id_utilisateur' => $validated['id_chef_projet'],
+                    'est_lue' => false,
+                ]);
+            }
+
+            // Ajout des participants additionnels
+            if (!empty($validated['participants_reunion'])) {
+                foreach ($validated['participants_reunion'] as $participantId) {
+                    if ($participantId == $user->id || $participantId == $validated['id_chef_projet']) {
+                        continue; // Déjà ajouté plus haut
+                    }
+
+                    // 1. L'ajouter à la réunion
+                    ParticipationReunion::create([
+                        'id_reunion' => $reunion->id,
+                        'id_utilisateur' => $participantId,
+                        'statut_presence' => 'en_attente',
+                    ]);
+
+                    // 2. L'ajouter en tant que membre au projet (s'il n'y est pas)
+                    ParticipationProjet::firstOrCreate(
+                        ['id_projet' => $projet->id, 'id_utilisateur' => $participantId],
+                        ['role_projet' => 'membre', 'statut' => 'actif', 'date_affectation' => now()]
+                    );
+
+                    // 3. Lui envoyer une notification pour la réunion
+                    $notifMembre = Notification::create([
+                        'type_evenement' => 'reunion',
+                        'titre' => 'Invitation à la réunion de démarrage',
+                        'contenu' => "Vous êtes convié à la réunion de démarrage du projet '{$projet->titre}'.",
+                        'type_cible' => 'reunion',
+                        'id_cible' => $reunion->id,
+                        'id_emetteur' => $user->id,
+                    ]);
+
+                    NotificationDestinataire::create([
+                        'id_notification' => $notifMembre->id,
+                        'id_utilisateur' => $participantId,
+                        'est_lue' => false,
+                    ]);
+                }
+            }
+        }
+
+        return response()->json($projet->load('membres'), 201);
+    }
+
+    /**
+     * Initiation d'un projet par l'Architecte.
+     */
+    public function initier(Request $request)
+    {
+        $user = $request->user();
+        if ($user->fonction !== 'Architecte' && $user->fonction !== 'Architecte de projet') {
+            return response()->json(['message' => 'Seul un Architecte peut initier un projet.'], 403);
+        }
+
+        $validated = $request->validate([
+            'titre' => 'required|string|max:200',
+            'description' => 'required|string',
+            'objectif' => 'nullable|string',
+            'division' => 'required|string',
+            'partenaire' => 'nullable|string',
+            'date_debut' => 'required|date',
+            'date_fin' => 'required|date|after_or_equal:date_debut',
+            'priorite' => 'required|in:basse,moyenne,haute,critique',
         ]);
 
-        // L'Architecte est ajouté comme architecte
+        $projet = Projet::create(array_merge($validated, [
+            'id_createur' => $user->id,
+            'statut' => 'initie',
+            'avancement' => 0
+        ]));
+
+        // L'architecte est ajouté comme participant
         ParticipationProjet::create([
             'id_projet' => $projet->id,
             'id_utilisateur' => $user->id,
@@ -91,7 +265,58 @@ class ProjetController extends Controller
             'date_affectation' => now(),
         ]);
 
-        // Le Chef de projet désigné est ajouté
+        return response()->json($projet, 201);
+    }
+
+    /**
+     * Transmission de la fiche projet au Chef de projet par l'Architecte.
+     */
+    public function transmettreChef(Request $request, $id)
+    {
+        $projet = Projet::findOrFail($id);
+        $user = $request->user();
+
+        if ($user->fonction !== 'Architecte' && $user->fonction !== 'Architecte de projet') {
+            return response()->json(['message' => 'Seul un Architecte peut transmettre une fiche projet.'], 403);
+        }
+
+        if ($projet->id_createur !== $user->id || $projet->statut !== 'initie') {
+            return response()->json(['message' => 'Vous ne pouvez transmettre que vos projets initiés.'], 403);
+        }
+
+        $validated = $request->validate([
+            'id_chef_projet' => 'required|exists:utilisateurs,id',
+            'titre' => 'required|string|max:200',
+            'objectif' => 'nullable|string',
+            'description' => 'nullable|string',
+            'fiche_projet' => 'nullable|string', // CKEditor HTML
+            'fiche_fichier' => 'nullable|file|mimes:pdf,doc,docx|max:10240' // 10MB max
+        ]);
+
+        $chef = \App\Models\Utilisateur::find($validated['id_chef_projet']);
+        if ($chef && strtolower($chef->fonction) !== 'chef de projet') {
+            return response()->json(['message' => 'L\'utilisateur assigné doit avoir la fonction "Chef de projet".'], 422);
+        }
+
+        $updateData = [
+            'titre' => $validated['titre'],
+            'objectif' => $validated['objectif'] ?? $projet->objectif,
+            'description' => $validated['description'] ?? $projet->description,
+            'statut' => 'transmis_chef'
+        ];
+
+        if (isset($validated['fiche_projet'])) {
+            $updateData['fiche_projet'] = $validated['fiche_projet'];
+        }
+
+        if ($request->hasFile('fiche_fichier')) {
+            $path = $request->file('fiche_fichier')->store('fiches_projet', 'public');
+            $updateData['fiche_fichier'] = $path;
+        }
+
+        $projet->update($updateData);
+
+        // Assigner le chef de projet
         ParticipationProjet::create([
             'id_projet' => $projet->id,
             'id_utilisateur' => $validated['id_chef_projet'],
@@ -100,7 +325,17 @@ class ProjetController extends Controller
             'date_affectation' => now(),
         ]);
 
-        return response()->json($projet->load('membres'), 201);
+        // Notification
+        Notification::create([
+            'type_evenement' => 'projet_transmis',
+            'titre' => 'Nouveau projet transmis',
+            'contenu' => $user->prenom . ' ' . $user->nom . ' vous a transmis la fiche du projet : ' . $projet->titre,
+            'type_cible' => 'projet',
+            'id_cible' => $projet->id,
+            'id_emetteur' => $user->id,
+        ])->destinataires()->create(['id_utilisateur' => $validated['id_chef_projet']]);
+
+        return response()->json($projet);
     }
 
     /**
@@ -111,7 +346,11 @@ class ProjetController extends Controller
         $projet = Projet::with([
             'createur:id,nom,prenom,email,fonction',
             'membres:id,nom,prenom,email,fonction',
+            'taches.responsable:id,nom,prenom',
+            'taches.approbateur:id,nom,prenom',
+            'taches.racis.utilisateur:id,nom,prenom',
             'phases.activites.taches.responsable:id,nom,prenom',
+            'phases.activites.taches.approbateur:id,nom,prenom',
             'phases.activites.taches.racis.utilisateur:id,nom,prenom',
         ])->findOrFail($id);
 
@@ -131,21 +370,59 @@ class ProjetController extends Controller
             return response()->json(['message' => 'Accès non autorisé à ce projet.'], 403);
         }
 
-        // Si c'est juste un membre normal (pas chef, ni gestionnaire, ni admin), 
+        if ($projet->statut === 'archive' && !$hasGlobalAccess) {
+            return response()->json(['message' => 'Ce projet est archivé. Seul le Gestionnaire peut y accéder.'], 403);
+        }
+
+        // Si c'est juste un membre normal (pas chef, ni gestionnaire, ni admin),
         // on ne lui renvoie que les tâches où il est impliqué (R ou dans RACI).
-        if (!$isChefOrMore && !$isCreateur && $projet->phases) {
-            foreach ($projet->phases as $phase) {
-                foreach ($phase->activites as $activite) {
-                    $activite->setRelation('taches', $activite->taches->filter(function($tache) use ($user) {
-                        return $tache->id_responsable === $user->id || 
-                               $tache->id_approbateur === $user->id ||
-                               $tache->racis->contains('id_utilisateur', $user->id);
-                    })->values());
+        if (!$isChefOrMore && !$isCreateur) {
+            if ($projet->taches) {
+                $projet->setRelation('taches', $projet->taches->filter(function($tache) use ($user) {
+                    return $tache->id_responsable === $user->id || 
+                           $tache->id_approbateur === $user->id ||
+                           $tache->racis->contains('id_utilisateur', $user->id);
+                })->values());
+            }
+
+            if ($projet->phases) {
+                foreach ($projet->phases as $phase) {
+                    foreach ($phase->activites as $activite) {
+                        $activite->setRelation('taches', $activite->taches->filter(function($tache) use ($user) {
+                            return $tache->id_responsable === $user->id || 
+                                   $tache->id_approbateur === $user->id ||
+                                   $tache->racis->contains('id_utilisateur', $user->id);
+                        })->values());
+                    }
                 }
             }
         }
 
         return response()->json($projet);
+    }
+
+    /**
+     * Archiver ou désarchiver un projet.
+     * Réservé au gestionnaire ou admin.
+     */
+    public function archiver(Request $request, $id)
+    {
+        $user = $request->user();
+        $isGlobalManager = ($user->hasRole('Gestionnaire de projet') || $user->isAdminGlobally()) && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet';
+
+        if (!$isGlobalManager) {
+            return response()->json(['message' => 'Non autorisé. Seul le Gestionnaire peut archiver ou désarchiver un projet.'], 403);
+        }
+
+        $projet = Projet::findOrFail($id);
+        
+        $nouveauStatut = $projet->statut === 'archive' ? 'cloture' : 'archive';
+        $projet->update(['statut' => $nouveauStatut]);
+
+        return response()->json([
+            'message' => $nouveauStatut === 'archive' ? 'Projet archivé avec succès.' : 'Projet désarchivé avec succès.',
+            'projet' => $projet
+        ]);
     }
 
     /**
@@ -180,6 +457,24 @@ class ProjetController extends Controller
             ['role_projet' => $validated['role_projet'], 'statut' => 'actif', 'date_affectation' => now()]
         );
         
+        // Notification au nouveau membre (s'il ne s'ajoute pas lui-même)
+        if ($validated['id_utilisateur'] != $user->id) {
+            $notifMembre = Notification::create([
+                'type_evenement' => 'projet',
+                'titre' => 'Ajout à une équipe projet',
+                'contenu' => "Vous avez été ajouté à l'équipe du projet '{$projet->titre}' en tant que {$validated['role_projet']}.",
+                'type_cible' => 'projet',
+                'id_cible' => $projet->id,
+                'id_emetteur' => $user->id,
+            ]);
+
+            NotificationDestinataire::create([
+                'id_notification' => $notifMembre->id,
+                'id_utilisateur' => $validated['id_utilisateur'],
+                'est_lue' => false,
+            ]);
+        }
+        
         return response()->json($nouvelleParticipation, 200);
     }
 
@@ -191,26 +486,46 @@ class ProjetController extends Controller
         $projet = Projet::findOrFail($id);
 
         $user = $request->user();
-        $hasGlobalAccess = $user->isAdminGlobally() || $user->hasRole('Gestionnaire de projet');
+        $hasGlobalAccess = $user->isAdminGlobally() || in_array($user->fonction, ['Gestionnaire', 'Gestionnaire de projet', 'Superviseur']);
         
         $participation = ParticipationProjet::where('id_projet', $projet->id)
                                             ->where('id_utilisateur', $user->id)
                                             ->first();
                                             
-        $isChef = $participation && strtolower($participation->role_projet) === 'chef_projet';
+        $isManagerOrChef = $participation && in_array(strtolower($participation->role_projet), ['chef_projet', 'gestionnaire', 'architecte']);
 
-        if (!$hasGlobalAccess && !$isChef) {
+        if (!$hasGlobalAccess && !$isManagerOrChef) {
             return response()->json(['message' => 'Accès non autorisé. Seul le Gestionnaire ou Chef de projet peut modifier ce projet.'], 403);
         }
 
         $validated = $request->validate([
             'titre' => 'string|max:200',
+            'objectif' => 'nullable|string',
+            'division' => 'nullable|string',
             'description' => 'nullable|string',
             'date_debut' => 'date',
             'date_fin' => 'date|after_or_equal:date_debut',
             'priorite' => 'in:basse,moyenne,haute,critique',
-            'statut' => 'in:a_demarrer,en_cours,suspendu,cloture,annule,archive',
+            'statut' => 'in:initie,transmis_chef,a_demarrer,en_cours,suspendu,cloture,annule,archive',
         ]);
+
+        // Machine d'états pour le statut
+        if (isset($validated['statut']) && $validated['statut'] !== $projet->statut) {
+            $allowedTransitions = [
+                'initie' => ['transmis_chef', 'annule'],
+                'transmis_chef' => ['a_demarrer', 'annule'],
+                'a_demarrer' => ['en_cours', 'annule'],
+                'en_cours' => ['suspendu', 'cloture', 'annule'],
+                'suspendu' => ['en_cours', 'cloture', 'annule'],
+                'cloture' => ['archive', 'en_cours'],
+                'annule' => ['initie', 'a_demarrer'],
+                'archive' => ['cloture']
+            ];
+            
+            if (!isset($allowedTransitions[$projet->statut]) || !in_array($validated['statut'], $allowedTransitions[$projet->statut])) {
+                return response()->json(['message' => 'Transition de statut invalide de '.$projet->statut.' vers '.$validated['statut']], 422);
+            }
+        }
 
         $projet->update($validated);
 

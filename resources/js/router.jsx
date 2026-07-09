@@ -6,9 +6,16 @@ import DashboardLayout from './layouts/DashboardLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import ListeProjets from './pages/Projets/ListeProjets';
 import ProjetDetail from './pages/Projets/ProjetDetail';
-import Reunions from './pages/Reunions';
+import Demandes from './pages/Demandes/Index';
+import Reunions from './pages/Reunions/Index';
+import Notifications from './pages/Notifications';
 import UtilisateursAdmin from './pages/Admin/UtilisateursAdmin';
 import JournalAudit from './pages/Admin/JournalAudit';
+import Calendrier from './pages/Calendrier/Index';
+import Profil from './pages/Profil';
+import Parametres from './pages/Parametres';
+import Personnalisation from './pages/Personnalisation';
+import Aide from './pages/Aide';
 
 // Bug fix #3 : plus de chevauchement de routes sur '/'.
 // Bug fix #8 : ProtectedRoute enveloppe les pages sécurisées.
@@ -46,8 +53,36 @@ const router = createBrowserRouter([
                 element: <ProjetDetail />,
             },
             {
+                path: 'demandes',
+                element: <Demandes />,
+            },
+            {
                 path: 'reunions',
                 element: <Reunions />,
+            },
+            {
+                path: 'notifications',
+                element: <Notifications />,
+            },
+            {
+                path: 'profil',
+                element: <Profil />,
+            },
+            {
+                path: 'parametres',
+                element: <Parametres />,
+            },
+            {
+                path: 'personnalisation',
+                element: <Personnalisation />,
+            },
+            {
+                path: 'aide',
+                element: <Aide />,
+            },
+            {
+                path: 'calendrier',
+                element: <Calendrier />,
             },
             {
                 path: 'admin/utilisateurs',

@@ -84,7 +84,7 @@ const UtilisateursAdmin = () => {
     const fetchUsers = async () => {
         try {
             const res = await api.get('/api/admin/users');
-            setUtilisateurs(res.data);
+            setUtilisateurs(res.data.data || res.data);
         } catch (e) {
             console.error(e);
         } finally {

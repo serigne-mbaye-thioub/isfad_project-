@@ -63,7 +63,7 @@ export const ModalCreateTache = ({ phases, projetId, membres = [], onClose, onSu
 
     useEffect(() => {
         api.get('/api/utilisateurs')
-            .then(res => setAllUsers(res.data))
+            .then(res => setAllUsers(Array.isArray(res.data) ? res.data : (res.data.data || [])))
             .catch(err => console.error(err))
             .finally(() => setLoadingUsers(false));
     }, []);

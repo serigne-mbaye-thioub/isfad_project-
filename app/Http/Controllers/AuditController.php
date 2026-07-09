@@ -14,14 +14,9 @@ class AuditController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $currentUser = $request->user();
-        if (!$currentUser || !in_array($currentUser->fonction, ['Administrateur', 'Administrateur système'])) {
-            return response()->json(['message' => 'Accès non autorisé.'], 403);
-        }
-
         $audits = JournalAudit::with('utilisateur')
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->paginate(50);
 
         return response()->json($audits);
     }

@@ -32,12 +32,23 @@ class Utilisateur extends Authenticatable
         'fonction',
         'actif',
         'premiere_connexion',
+        'photo_profil',
     ];
 
     protected $hidden = [
         'mot_de_passe',
         'remember_token',
     ];
+
+    protected $appends = ['photo_profil_url'];
+
+    public function getPhotoProfilUrlAttribute()
+    {
+        if ($this->photo_profil) {
+            return url('storage/' . $this->photo_profil);
+        }
+        return null;
+    }
 
     protected function casts(): array
     {

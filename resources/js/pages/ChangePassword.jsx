@@ -9,7 +9,6 @@ import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
  * Remplace l'alert() non professionnel de Login.jsx.
  */
 const ChangePassword = () => {
-    const [current, setCurrent] = useState('');
     const [newPass, setNewPass] = useState('');
     const [confirm, setConfirm] = useState('');
     const [showNew, setShowNew] = useState(false);
@@ -27,7 +26,6 @@ const ChangePassword = () => {
         setError('');
         try {
             const response = await api.post('/api/change-password', {
-                mot_de_passe_actuel: current,
                 nouveau_mot_de_passe: newPass,
                 nouveau_mot_de_passe_confirmation: confirm,
             });
@@ -70,16 +68,6 @@ const ChangePassword = () => {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wider">Mot de passe actuel (temporaire)</label>
-                        <input
-                            type="password"
-                            value={current}
-                            onChange={(e) => setCurrent(e.target.value)}
-                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition text-sm"
-                            required
-                        />
-                    </div>
                     <div>
                         <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wider">Nouveau mot de passe</label>
                         <div className="relative">

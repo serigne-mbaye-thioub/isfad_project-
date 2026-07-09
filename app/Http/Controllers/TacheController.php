@@ -49,7 +49,8 @@ class TacheController extends Controller
             'titre'          => 'required|string|max:200',
             'description'    => 'nullable|string',
             'priorite'       => 'nullable|in:basse,moyenne,haute,critique',
-            'date_limite'    => 'required|date',
+            'date_debut'     => 'nullable|date',
+            'date_limite'    => 'required|date|after_or_equal:date_debut',
             'id_responsable' => 'nullable|exists:utilisateurs,id',
             'id_approbateur' => 'nullable|exists:utilisateurs,id',
             'consultes'      => 'nullable|array',
@@ -72,7 +73,7 @@ class TacheController extends Controller
             'titre'          => $validated['titre'],
             'description'    => $validated['description'] ?? null,
             'priorite'       => $validated['priorite'] ?? 'moyenne',
-            'date_debut'     => now()->toDateString(), // automatiquement aujourd'hui
+            'date_debut'     => $validated['date_debut'] ?? now()->toDateString(),
             'date_limite'    => $validated['date_limite'],
             'id_responsable' => $validated['id_responsable'] ?? $request->user()->id,
             'id_approbateur' => $validated['id_approbateur'] ?? null,
@@ -88,6 +89,46 @@ class TacheController extends Controller
             foreach ($validated['informes'] as $i) {
                 TacheRaci::create(['id_tache' => $tache->id, 'id_utilisateur' => $i, 'role_raci' => 'informe']);
             }
+        }
+
+        $this->ensureUsersInProject($tache, array_merge($validated['consultes'] ?? [], $validated['informes'] ?? []));
+
+        // Envoi des notifications
+        $utilisateursANotifier = collect([
+            $tache->id_responsable => 'Responsable (R)',
+            $tache->id_approbateur => 'Approbateur (A)'
+        ])->filter(function($role, $id) use ($request) {
+            return $id && $id != $request->user()->id; // Ne pas se notifier soi-même
+        });
+
+        if (!empty($validated['consultes'])) {
+            foreach ($validated['consultes'] as $c) {
+                if ($c != $request->user()->id) $utilisateursANotifier->put($c, 'Consulté (C)');
+            }
+        }
+        if (!empty($validated['informes'])) {
+            foreach ($validated['informes'] as $i) {
+                if ($i != $request->user()->id) $utilisateursANotifier->put($i, 'Informé (I)');
+            }
+        }
+
+        $idProjetLien = $tache->id_projet ?? $tache->activite?->id_projet ?? $tache->activite?->phase?->id_projet;
+
+        foreach ($utilisateursANotifier as $idUser => $roleInfo) {
+            $notifTache = \App\Models\Notification::create([
+                'type_evenement' => 'tache',
+                'titre' => 'Nouvelle tâche assignée',
+                'contenu' => "Vous avez été désigné comme {$roleInfo} pour la tâche '{$tache->titre}'.",
+                'type_cible' => 'projet', // On lie au projet pour que le bouton "Voir le projet" fonctionne
+                'id_cible' => $idProjetLien,
+                'id_emetteur' => $request->user()->id,
+            ]);
+
+            \App\Models\NotificationDestinataire::create([
+                'id_notification' => $notifTache->id,
+                'id_utilisateur' => $idUser,
+                'est_lue' => false,
+            ]);
         }
 
         return response()->json($tache, 201);
@@ -110,18 +151,28 @@ class TacheController extends Controller
         // 1. Est-il Responsable ou Approbateur de la tâche ?
         $isRA = ($tache->id_responsable === $user->id) || ($tache->id_approbateur === $user->id);
 
-        // 2. Est-il "Consulté" dans la matrice RACI ?
-        $isConsulte = TacheRaci::where('id_tache', $tache->id)
-                               ->where('id_utilisateur', $user->id)
-                               ->where('role_raci', 'consulte')
-                               ->exists();
+        // 2. Est-il manager du projet (Admin, Gestionnaire, Chef de projet) ?
+        $idProjet = $tache->id_projet ?? $tache->activite?->phase?->id_projet ?? $tache->activite?->id_projet;
+        $isManager = false;
+        
+        if ($idProjet) {
+            $projet = \App\Models\Projet::find($idProjet);
+            if ($projet) {
+                $isGlobalManager = ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet');
+                $hasGlobalAccess = $user->isAdminGlobally() || ($isGlobalManager && $projet->transmis_gestionnaire);
+                
+                $participation = \App\Models\ParticipationProjet::where('id_projet', $projet->id)
+                    ->where('id_utilisateur', $user->id)
+                    ->where('statut', 'actif')
+                    ->first();
+                
+                $isManager = $hasGlobalAccess || ($participation && in_array($participation->role_projet, ['chef_projet', 'gestionnaire', 'architecte']));
+            }
+        }
 
-        // 3. Est-il Administrateur global ?
-        $isAdmin = in_array($user->fonction, ['Administrateur', 'Administrateur système']);
-
-        if (!$isRA && !$isConsulte && !$isAdmin) {
+        if (!$isRA && !$isManager) {
             return response()->json([
-                'message' => 'Accès non autorisé. Seuls le Responsable, l\'Approbateur ou une personne Consultée peuvent modifier le statut de cette tâche.'
+                'message' => 'Accès non autorisé. Seuls le Responsable, l\'Approbateur ou le gestionnaire du projet peuvent modifier le statut de cette tâche. Les consultés et informés sont en lecture seule.'
             ], 403);
         }
 
@@ -177,6 +228,8 @@ class TacheController extends Controller
             ['role_raci' => $validated['role_raci']]
         );
 
+        $this->ensureUsersInProject($tache, [$validated['id_utilisateur']]);
+
         return response()->json($raci);
     }
 
@@ -203,6 +256,38 @@ class TacheController extends Controller
 
         $tache->update($validated);
 
+        $this->ensureUsersInProject($tache);
+
         return response()->json($tache);
+    }
+
+    /**
+     * S'assurer que les utilisateurs liés à une tâche (Responsable, Approbateur, Consultés, Informés)
+     * sont bien ajoutés en tant que membre du projet pour qu'ils puissent voir la tâche et le projet.
+     */
+    private function ensureUsersInProject($tache, $additionalUserIds = [])
+    {
+        $idProjet = $tache->id_projet;
+        if (!$idProjet && $tache->id_activite) {
+            $activite = \App\Models\Activite::with('phase')->find($tache->id_activite);
+            if ($activite) {
+                $idProjet = $activite->id_projet ?? $activite->phase?->id_projet;
+            }
+        }
+
+        if ($idProjet) {
+            $userIds = array_filter(array_merge(
+                [$tache->id_responsable, $tache->id_approbateur],
+                $additionalUserIds
+            ));
+            $userIds = array_unique($userIds);
+
+            foreach ($userIds as $uid) {
+                \App\Models\ParticipationProjet::firstOrCreate(
+                    ['id_projet' => $idProjet, 'id_utilisateur' => $uid],
+                    ['role_projet' => 'membre', 'statut' => 'actif', 'date_affectation' => now()]
+                );
+            }
+        }
     }
 }

@@ -22,12 +22,12 @@ class ReunionController extends Controller
     {
         $user = $request->user();
 
-        // Récupère les réunions planifiées où l'utilisateur est invité ou organisateur
-        $reunions = Reunion::where('statut', 'planifiee')
+        // Récupère les réunions planifiées ou terminées où l'utilisateur est invité ou organisateur
+        $reunions = Reunion::whereIn('statut', ['planifiee', 'terminee'])
             ->where(function ($query) use ($user) {
                 $query->where('id_organisateur', $user->id)
                       ->orWhereHas('participants', function ($q) use ($user) {
-                          $q->where('id_utilisateur', $user->id);
+                          $q->where('utilisateurs.id', $user->id);
                       });
             })
             ->with(['organisateur', 'participants', 'projet'])
@@ -50,15 +50,25 @@ class ReunionController extends Controller
             return response()->json($demandes);
         }
 
-        // Sinon, ne voit que les demandes des projets où il est Chef de projet, Gestionnaire, ou Superviseur
-        $projetsGeresIds = ParticipationProjet::where('id_utilisateur', $user->id)
-            ->whereIn('role_projet', ['chef_projet', 'gestionnaire_projet', 'superviseur'])
+        // Sinon, on filtre selon les droits
+        $projetsEquipeIds = ParticipationProjet::where('id_utilisateur', $user->id)
+            ->whereIn('role_projet', ['chef_projet', 'gestionnaire', 'gestionnaire_projet', 'superviseur'])
             ->pluck('id_projet');
 
-        $demandes = Reunion::where('statut', 'en_attente')
-            ->whereIn('id_projet', $projetsGeresIds)
-            ->with(['organisateur', 'projet'])
-            ->get();
+        $query = Reunion::where('statut', 'en_attente')->with(['organisateur', 'projet']);
+
+        if (in_array($user->fonction, ['Gestionnaire', 'Gestionnaire de projet'])) {
+            $query->where(function($q) use ($projetsEquipeIds) {
+                $q->whereIn('id_projet', $projetsEquipeIds)
+                  ->orWhereHas('projet', function($q2) {
+                      $q2->where('transmis_gestionnaire', true);
+                  });
+            });
+        } else {
+            $query->whereIn('id_projet', $projetsEquipeIds);
+        }
+
+        $demandes = $query->get();
 
         return response()->json($demandes);
     }
@@ -93,10 +103,11 @@ class ReunionController extends Controller
             $participation = ParticipationProjet::where('id_projet', $validated['id_projet'])
                 ->where('id_utilisateur', $user->id)->first();
                 
-            if ($participation && in_array($participation->role_projet, ['chef_projet', 'gestionnaire_projet', 'superviseur'])) {
+            if ($participation && in_array($participation->role_projet, ['chef_projet', 'gestionnaire', 'gestionnaire_projet', 'superviseur'])) {
                 $statut = 'planifiee';
             }
-        } elseif (in_array($user->fonction, ['Chef de projet', 'Superviseur'])) { // Profil métier général
+        } elseif (in_array($user->fonction, ['Superviseur', 'Gestionnaire', 'Gestionnaire de projet'])) { 
+            // Seuls les rôles globaux peuvent planifier automatiquement sans projet
             $statut = 'planifiee';
         }
 
@@ -124,9 +135,42 @@ class ReunionController extends Controller
                 }
             }
 
-            // Si la réunion est directement planifiée, on envoie les notifs
+            // Si la réunion est directement planifiée, on envoie les notifs aux participants
             if ($statut === 'planifiee' && !empty($validated['participants'])) {
                 $this->notifierParticipants($reunion, collect($validated['participants']));
+            } elseif ($statut === 'en_attente') {
+                // Notifier les managers responsables
+                $managersANotifier = collect();
+                if ($reunion->id_projet) {
+                    $chefs = ParticipationProjet::where('id_projet', $reunion->id_projet)
+                        ->whereIn('role_projet', ['chef_projet', 'gestionnaire', 'gestionnaire_projet', 'superviseur'])
+                        ->pluck('id_utilisateur');
+                    $managersANotifier = $managersANotifier->merge($chefs);
+                } else {
+                    $admins = Utilisateur::whereIn('fonction', ['Administrateur', 'Administrateur système'])->pluck('id');
+                    $managersANotifier = $managersANotifier->merge($admins);
+                }
+
+                $managersANotifier = $managersANotifier->unique();
+
+                if ($managersANotifier->isNotEmpty()) {
+                    $notifDemande = Notification::create([
+                        'type_evenement' => 'reunion',
+                        'titre' => 'Nouvelle demande de réunion',
+                        'contenu' => "{$user->prenom} {$user->nom} a soumis une demande de réunion : '{$reunion->titre}'.",
+                        'type_cible' => 'reunion',
+                        'id_cible' => $reunion->id,
+                        'id_emetteur' => $user->id,
+                    ]);
+
+                    foreach ($managersANotifier as $mgrId) {
+                        NotificationDestinataire::create([
+                            'id_notification' => $notifDemande->id,
+                            'id_utilisateur' => $mgrId,
+                            'est_lue' => false,
+                        ]);
+                    }
+                }
             }
 
             DB::commit();
@@ -147,17 +191,17 @@ class ReunionController extends Controller
         $user = $request->user();
 
         // Vérification des droits
-        $isAdmin = in_array($user->fonction, ['Administrateur', 'Administrateur système']);
+        $isAdminOrGestionnaire = in_array($user->fonction, ['Administrateur', 'Administrateur système', 'Gestionnaire', 'Gestionnaire de projet']);
         $hasDroitsProjet = false;
 
         if ($reunion->id_projet) {
             $hasDroitsProjet = ParticipationProjet::where('id_projet', $reunion->id_projet)
                 ->where('id_utilisateur', $user->id)
-                ->whereIn('role_projet', ['chef_projet', 'gestionnaire_projet', 'superviseur'])
+                ->whereIn('role_projet', ['chef_projet', 'gestionnaire', 'gestionnaire_projet', 'superviseur'])
                 ->exists();
         }
 
-        if (!$isAdmin && !$hasDroitsProjet) {
+        if (!$isAdminOrGestionnaire && !$hasDroitsProjet) {
             return response()->json(['message' => 'Accès refusé. Vous n\'avez pas les droits pour valider cette réunion.'], 403);
         }
 

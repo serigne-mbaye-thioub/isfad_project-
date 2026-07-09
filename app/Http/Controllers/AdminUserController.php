@@ -18,12 +18,10 @@ class AdminUserController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $currentUser = $request->user();
-        if (!$currentUser || !in_array($currentUser->fonction, ['Administrateur', 'Administrateur système'])) {
-            return response()->json(['message' => 'Accès non autorisé.'], 403);
-        }
-
-        $utilisateurs = Utilisateur::orderBy('created_at', 'desc')->get();
+        $utilisateurs = Utilisateur::select('id', 'nom', 'prenom', 'email', 'telephone', 'fonction', 'actif', 'premiere_connexion', 'created_at')
+            ->orderBy('created_at', 'desc')
+            ->paginate(50);
+            
         return response()->json($utilisateurs);
     }
     /**
@@ -32,13 +30,7 @@ class AdminUserController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        // 1. Autorisation : vérification stricte du rôle Administrateur
         $currentUser = $request->user();
-        if (!$currentUser || !in_array($currentUser->fonction, ['Administrateur', 'Administrateur système'])) {
-            return response()->json([
-                'message' => 'Accès non autorisé. Seul un administrateur peut effectuer cette action.',
-            ], 403);
-        }
 
         // 2. Validation des données d'entrée
         $validated = $request->validate([
@@ -105,9 +97,6 @@ class AdminUserController extends Controller
     public function updateStatut(Request $request, $id): JsonResponse
     {
         $currentUser = $request->user();
-        if (!$currentUser || !in_array($currentUser->fonction, ['Administrateur', 'Administrateur système'])) {
-            return response()->json(['message' => 'Accès non autorisé.'], 403);
-        }
 
         $validated = $request->validate([
             'actif' => 'required|boolean'

@@ -24,11 +24,19 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response && error.response.status === 401) {
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('auth_user');
-            if (window.location.pathname !== '/login') {
-                window.location.href = '/login';
+        if (error.response) {
+            if (error.response.status === 401) {
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('auth_user');
+                if (window.location.pathname !== '/login') {
+                    window.location.href = '/login';
+                }
+            } else if (error.response.status === 403) {
+                // Émettre un événement personnalisé pour notifier l'UI globalement
+                const event = new CustomEvent('api:403', { 
+                    detail: { message: error.response.data.message || 'Accès refusé' } 
+                });
+                window.dispatchEvent(event);
             }
         }
         return Promise.reject(error);

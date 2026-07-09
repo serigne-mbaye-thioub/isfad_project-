@@ -48,6 +48,11 @@ class Tache extends Model
 
     // ─── Relations ────────────────────────────────────────────────────────────
 
+    public function commentaires(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(TacheCommentaire::class, 'id_tache')->orderBy('created_at', 'asc');
+    }
+
     /** Projet auquel appartient directement cette tâche (optionnel si liée à une activité) */
     public function projet(): BelongsTo
     {

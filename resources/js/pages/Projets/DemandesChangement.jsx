@@ -12,7 +12,7 @@ const DemandesChangement = ({ projetId, currentUser }) => {
     const fetchDemandes = async () => {
         try {
             const res = await api.get(`/api/projets/${projetId}/demandes-changement`);
-            setDemandes(res.data);
+            setDemandes(Array.isArray(res.data) ? res.data : (res.data.data || []));
         } catch (e) {
             console.error(e);
         } finally {

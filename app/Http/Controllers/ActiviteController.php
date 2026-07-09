@@ -8,12 +8,37 @@ use Illuminate\Http\Request;
 
 class ActiviteController extends Controller
 {
+    private function peutGererActivite($user, $id_projet)
+    {
+        $isGlobalManager = ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet');
+        
+        if ($user->isAdminGlobally()) {
+            return true;
+        }
+        
+        $projet = \App\Models\Projet::find($id_projet);
+        if ($isGlobalManager && $projet && $projet->transmis_gestionnaire) {
+            return true;
+        }
+
+        $participation = \App\Models\ParticipationProjet::where('id_projet', $id_projet)
+            ->where('id_utilisateur', $user->id)
+            ->where('statut', 'actif')
+            ->first();
+
+        return $participation && in_array($participation->role_projet, ['chef_projet', 'gestionnaire', 'architecte']);
+    }
+
     /**
      * Création d'une activité dans une phase
      */
     public function store(Request $request, $id_phase)
     {
         $phase = Phase::findOrFail($id_phase);
+        
+        if (!$this->peutGererActivite($request->user(), $phase->id_projet)) {
+            return response()->json(['message' => 'Accès non autorisé.'], 403);
+        }
 
         $validated = $request->validate([
             'titre' => 'required|string|max:200',
@@ -40,6 +65,11 @@ class ActiviteController extends Controller
     public function update(Request $request, $id)
     {
         $activite = Activite::findOrFail($id);
+        $phase = $activite->phase;
+        
+        if (!$this->peutGererActivite($request->user(), $phase->id_projet)) {
+            return response()->json(['message' => 'Accès non autorisé.'], 403);
+        }
 
         $validated = $request->validate([
             'titre' => 'string|max:200',
@@ -59,9 +89,15 @@ class ActiviteController extends Controller
     /**
      * Suppression d'une activité
      */
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         $activite = Activite::findOrFail($id);
+        $phase = $activite->phase;
+        
+        if (!$this->peutGererActivite($request->user(), $phase->id_projet)) {
+            return response()->json(['message' => 'Accès non autorisé.'], 403);
+        }
+        
         $activite->delete();
 
         return response()->json(['message' => 'Activité supprimée avec succès'], 200);

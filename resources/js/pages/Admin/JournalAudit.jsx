@@ -11,7 +11,7 @@ const JournalAudit = () => {
         const fetchAudits = async () => {
             try {
                 const res = await api.get('/api/admin/audits');
-                setAudits(res.data);
+                setAudits(res.data.data || res.data);
             } catch (e) {
                 console.error(e);
             } finally {
