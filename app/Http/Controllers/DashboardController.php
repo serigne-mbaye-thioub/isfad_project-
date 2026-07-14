@@ -41,8 +41,8 @@ class DashboardController extends Controller
             return $this->getArchitecteStats($user);
         }
 
-        // Autres (Membres) -> Pas de tableau de bord décisionnel complexe par défaut
-        return response()->json(['message' => 'Pas de données de tableau de bord pour ce rôle.'], 200);
+        // Autres (Membres) -> Vue détaillée pour les collaborateurs
+        return $this->getMembreStats($user);
     }
 
     private function getAdminStats(): JsonResponse
@@ -62,6 +62,7 @@ class DashboardController extends Controller
             'role_vue' => 'Administrateur',
             'utilisateurs' => $utilisateurs,
             'activite_recente' => $activite_recente,
+            'sa_journee' => $this->getSaJournee(Auth::user())
         ]);
     }
 
@@ -100,14 +101,12 @@ class DashboardController extends Controller
     {
         // Filtrer pour ne conserver que les projets actifs (non archivés, non annulés)
         $projetsIds = \App\Models\Projet::whereIn('id', empty($projetsIds) ? [0] : $projetsIds)
-            ->whereNotIn('statut', ['archive', 'annule'])
+            ->whereNotIn('statut', ['archive', 'annule', 'cloture'])
             ->pluck('id')->toArray();
 
         $safeProjetIds = empty($projetsIds) ? [0] : $projetsIds;
 
-        $activitesIds = \App\Models\Activite::whereHas('phase', function($q) use ($safeProjetIds) {
-            $q->whereIn('id_projet', $safeProjetIds);
-        })->pluck('id')->toArray();
+        $activitesIds = \App\Models\Activite::whereIn('id_projet', $safeProjetIds)->pluck('id')->toArray();
         
         $safeActivitesIds = empty($activitesIds) ? [0] : $activitesIds;
 
@@ -124,26 +123,60 @@ class DashboardController extends Controller
         
         $reunionsAVenir = \App\Models\Reunion::where('statut', 'planifiee')
             ->where('date_reunion', '>=', now())
-            ->where(function ($q) use ($user, $projetsIds) {
-                if (!empty($projetsIds)) {
-                    $q->whereIn('id_projet', $projetsIds)
-                      ->orWhere('id_organisateur', $user->id)
-                      ->orWhereHas('participants', function ($q2) use ($user) {
-                          $q2->where('id_utilisateur', $user->id);
-                      });
-                } else {
-                    $q->where('id_organisateur', $user->id)
-                      ->orWhereHas('participants', function ($q2) use ($user) {
-                          $q2->where('id_utilisateur', $user->id);
-                      });
-                }
+            ->where(function ($q) use ($user) {
+                $q->where('id_organisateur', $user->id)
+                  ->orWhereHas('participants', function ($q2) use ($user) {
+                      $q2->where('id_utilisateur', $user->id);
+                  });
             })->count();
 
-        $projetsARisque = Projet::whereIn('id', empty($projetsIds) ? [0] : $projetsIds)
-            ->where(function($q) {
-                $q->where('statut', 'suspendu')
-                  ->orWhere('priorite', 'critique');
-            })->count();
+        $projetsActifsList = Projet::whereIn('id', empty($projetsIds) ? [0] : $projetsIds)
+            ->whereNotIn('statut', ['cloture', 'archive', 'annule'])
+            ->get(['id', 'statut', 'date_fin']);
+
+        $projetsARisque = 0;
+        foreach ($projetsActifsList as $p) {
+            $isAtRisk = false;
+            
+            // Règle 1 : Projet formellement suspendu
+            if ($p->statut === 'suspendu') {
+                $isAtRisk = true;
+            }
+            // Règle 2 : Date de fin globale dépassée
+            elseif ($p->date_fin && \Carbon\Carbon::parse($p->date_fin)->isPast()) {
+                $isAtRisk = true;
+            }
+            // Règle 3 (Ingénierie) : Analyse quantitative des goulets d'étranglement (Tâches en retard)
+            else {
+                $actIds = \App\Models\Activite::where('id_projet', $p->id)->pluck('id')->toArray();
+                
+                $projetTachesQuery = \App\Models\Tache::whereNotIn('statut', ['terminee', 'cloture'])
+                    ->where(function($q) use ($p, $actIds) {
+                        $q->where('id_projet', $p->id);
+                        if (!empty($actIds)) {
+                            $q->orWhereIn('id_activite', $actIds);
+                        }
+                    });
+
+                $totalTaches = (clone $projetTachesQuery)->count();
+                $tachesEnRetard = (clone $projetTachesQuery)->where('date_limite', '<', now()->startOfDay())->count();
+
+                if ($totalTaches > 0) {
+                    $ratioRetard = $tachesEnRetard / $totalTaches;
+                    // Un projet est à risque si :
+                    // - Plus de 30% de ses tâches actives sont en retard (avec un minimum absolu de 3 tâches pour éviter les faux positifs)
+                    // OU
+                    // - Il a plus de 6 tâches en retard au total (volume critique de blocage)
+                    if (($ratioRetard >= 0.30 && $tachesEnRetard >= 3) || $tachesEnRetard >= 6) {
+                        $isAtRisk = true;
+                    }
+                }
+            }
+
+            if ($isAtRisk) {
+                $projetsARisque++;
+            }
+        }
 
         // Avancement des projets récents (tous les non-cloturés)
         $avancementProjets = Projet::whereIn('id', empty($projetsIds) ? [0] : $projetsIds)
@@ -215,6 +248,158 @@ class DashboardController extends Controller
             ],
             'taches_terminees_mois' => array_values($months),
             'repartition_taches' => $tachesStatuts,
+            'sa_journee' => $this->getSaJournee($user, $tachesQuery, $roleVue)
         ]);
+    }
+
+    private function getMembreStats($user): JsonResponse
+    {
+        // Projets où l'utilisateur est membre
+        $projetsIds = \App\Models\ParticipationProjet::where('id_utilisateur', $user->id)
+            ->where('statut', 'actif')
+            ->whereHas('projet', function ($q) {
+                $q->whereNotIn('statut', ['archive', 'annule', 'cloture']);
+            })
+            ->pluck('id_projet')->toArray();
+
+        $safeProjetIds = empty($projetsIds) ? [0] : $projetsIds;
+
+        $activitesIds = \App\Models\Activite::whereIn('id_projet', $safeProjetIds)->pluck('id')->toArray();
+        $safeActivitesIds = empty($activitesIds) ? [0] : $activitesIds;
+
+        // Requête pour les tâches (assigné ou RACI) uniquement sur les projets actifs
+        $tachesQuery = function($q) use ($user, $safeProjetIds, $safeActivitesIds) {
+            $q->where(function($q2) use ($user) {
+                $q2->where('id_responsable', $user->id)
+                   ->orWhereHas('racis', function($r) use ($user) {
+                       $r->where('id_utilisateur', $user->id);
+                   });
+            })->where(function($q3) use ($safeProjetIds, $safeActivitesIds) {
+                $q3->whereIn('id_projet', $safeProjetIds)->orWhereIn('id_activite', $safeActivitesIds);
+            });
+        };
+
+        $totalTaches = Tache::where($tachesQuery)->count();
+        $tachesAfaire = Tache::where($tachesQuery)->where('statut', 'a_faire')->count();
+        $tachesEnCours = Tache::where($tachesQuery)->where('statut', 'en_cours')->count();
+        $tachesTerminees = Tache::where($tachesQuery)->whereIn('statut', ['terminee', 'cloture'])->count();
+        $tachesEnRetard = Tache::where($tachesQuery)->whereIn('statut', ['a_faire', 'en_cours', 'en_revision'])->where('date_limite', '<', now()->startOfDay())->count();
+
+        // Prochaines réunions
+        $reunionsAVenir = \App\Models\Reunion::where('statut', 'planifiee')
+            ->where('date_reunion', '>=', now())
+            ->where(function ($q) use ($user) {
+                $q->where('id_organisateur', $user->id)
+                  ->orWhereHas('participants', function ($q2) use ($user) {
+                      $q2->where('id_utilisateur', $user->id);
+                  });
+            })
+            ->with('projet:id,titre')
+            ->orderBy('date_reunion', 'asc')
+            ->limit(5)
+            ->get();
+
+        // Tâches récentes / urgentes
+        $tachesUrgentes = Tache::where($tachesQuery)
+            ->whereNotIn('statut', ['terminee', 'cloture'])
+            ->with(['activite.phase'])
+            ->orderBy('date_limite', 'asc')
+            ->limit(5)
+            ->get();
+
+        // Avancement des projets
+        $avancementProjets = Projet::whereIn('id', $safeProjetIds)
+            ->whereNotIn('statut', ['cloture', 'archive', 'annule'])
+            ->orderBy('updated_at', 'desc')
+            ->get(['id', 'titre', 'avancement']);
+
+        return response()->json([
+            'role_vue' => 'Membre',
+            'kpis' => [
+                'total_taches' => $totalTaches,
+                'taches_a_faire' => $tachesAfaire,
+                'taches_en_cours' => $tachesEnCours,
+                'taches_terminees' => $tachesTerminees,
+                'taches_en_retard' => $tachesEnRetard,
+                'projets_actifs' => count($projetsIds),
+                'reunions_a_venir' => count($reunionsAVenir),
+            ],
+            'avancement_projets' => $avancementProjets,
+            'taches_urgentes' => $tachesUrgentes,
+            'reunions_a_venir_list' => $reunionsAVenir,
+            'sa_journee' => $this->getSaJournee($user, $tachesQuery, 'Membre')
+        ]);
+    }
+
+    private function getSaJournee($user, $tachesQuery = null, $roleVue = 'Membre')
+    {
+        $today = now()->format('Y-m-d');
+        
+        $isAdmin = in_array($user->fonction, ['Administrateur', 'Administrateur système']);
+        $managedProjectIds = [];
+        
+        if ($isAdmin) {
+            $managedProjectIds = \App\Models\Projet::pluck('id')->toArray();
+        } else {
+            $isGlobalManager = ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet');
+            $globalManaged = $isGlobalManager ? \App\Models\Projet::where('transmis_gestionnaire', true)->pluck('id')->toArray() : [];
+            $localManaged = \App\Models\ParticipationProjet::where('id_utilisateur', $user->id)
+                ->whereIn('role_projet', ['chef_projet', 'gestionnaire', 'architecte'])
+                ->where('statut', 'actif')
+                ->pluck('id_projet')->toArray();
+            $managedProjectIds = array_unique(array_merge($globalManaged, $localManaged));
+        }
+
+        $taches = \App\Models\Tache::query();
+        if (!$isAdmin) {
+            // Filtrer explicitement les projets clôturés (groupé)
+            $taches->where(function($queryWrapper) {
+                $queryWrapper->whereHas('projet', function($q) {
+                    $q->whereNotIn('statut', ['archive', 'annule', 'cloture']);
+                })->orWhereHas('activite.projet', function($q2) {
+                    $q2->whereNotIn('statut', ['archive', 'annule', 'cloture']);
+                });
+            });
+
+            $taches->where(function($q) use ($user, $managedProjectIds) {
+                if (!empty($managedProjectIds)) {
+                    $q->whereIn('id_projet', $managedProjectIds)
+                      ->orWhereHas('activite.phase', function($q2) use ($managedProjectIds) {
+                          $q2->whereIn('id_projet', $managedProjectIds);
+                      });
+                }
+                $q->orWhere('id_responsable', $user->id)
+                  ->orWhere('id_approbateur', $user->id)
+                  ->orWhereHas('racis', function($qRaci) use ($user) {
+                      $qRaci->where('id_utilisateur', $user->id);
+                  });
+            });
+        }
+        
+        $taches = $taches->whereDate('date_limite', '<=', $today)
+            ->whereNotIn('statut', ['terminee', 'cloture'])
+            ->with('projet:id,titre')
+            ->get(['id', 'titre', 'statut', 'priorite', 'date_limite', 'id_projet']);
+
+        $reunions = \App\Models\Reunion::query();
+        if (!$isAdmin) {
+            $reunions->where(function($q) use ($user) {
+                $q->where('id_organisateur', $user->id)
+                  ->orWhereHas('participants', function($qPart) use ($user) {
+                      $qPart->where('id_utilisateur', $user->id);
+                  });
+            });
+        }
+        
+        $reunions = $reunions->whereDate('date_reunion', $today)
+            ->where('statut', '!=', 'annulee')
+            ->with('projet:id,titre')
+            ->orderBy('date_reunion', 'asc')
+            ->get(['id', 'titre', 'date_reunion', 'duree_minutes', 'statut', 'id_projet']);
+
+        return [
+            'taches' => $taches,
+            'reunions' => $reunions
+        ];
     }
 }

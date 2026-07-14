@@ -238,11 +238,37 @@ class DemandeChangementController extends Controller
 
         $validated = $request->validate([
             'statut' => 'required|in:en_attente,acceptee,refusee,annulee',
+            'commentaire_decision' => 'nullable|string',
         ]);
         
         $demande->statut = $validated['statut'];
+        $demande->commentaire_decision = $validated['commentaire_decision'] ?? null;
         $demande->date_traitement = now();
         $demande->save();
+
+        // ── Notification de décision au demandeur ──
+        if (in_array($demande->statut, ['acceptee', 'refusee'])) {
+            $etatFR = $demande->statut === 'acceptee' ? 'acceptée' : 'refusée';
+            $contenuNotif = "Votre demande de changement \"{$demande->titre}\" a été {$etatFR}.";
+            if ($demande->commentaire_decision) {
+                $contenuNotif .= " Commentaire du gestionnaire : " . $demande->commentaire_decision;
+            }
+
+            $notif = \App\Models\Notification::create([
+                'type_evenement' => 'demande_changement',
+                'titre' => "Demande de changement {$etatFR}",
+                'contenu' => $contenuNotif,
+                'type_cible' => $demande->type_cible,
+                'id_cible' => $demande->id_cible,
+                'id_emetteur' => $user->id,
+            ]);
+
+            \App\Models\NotificationDestinataire::create([
+                'id_notification' => $notif->id,
+                'id_utilisateur' => $demande->id_demandeur,
+                'est_lue' => false,
+            ]);
+        }
 
         return response()->json([
             'message' => 'Statut de la demande mis à jour.',

@@ -30,13 +30,13 @@ class ActiviteController extends Controller
     }
 
     /**
-     * Création d'une activité dans une phase
+     * Création d'une activité dans un projet
      */
-    public function store(Request $request, $id_phase)
+    public function store(Request $request, $id_projet)
     {
-        $phase = Phase::findOrFail($id_phase);
+        $projet = \App\Models\Projet::findOrFail($id_projet);
         
-        if (!$this->peutGererActivite($request->user(), $phase->id_projet)) {
+        if (!$this->peutGererActivite($request->user(), $projet->id)) {
             return response()->json(['message' => 'Accès non autorisé.'], 403);
         }
 
@@ -47,10 +47,12 @@ class ActiviteController extends Controller
             'date_fin' => 'required|date|after_or_equal:date_debut',
             'priorite' => 'nullable|in:basse,moyenne,haute,critique',
             'id_responsable' => 'nullable|exists:utilisateurs,id',
+            'id_phase' => 'nullable|exists:phases,id',
+            'id_jalon' => 'nullable|exists:jalons,id',
         ]);
 
         $activite = Activite::create(array_merge($validated, [
-            'id_phase' => $phase->id,
+            'id_projet' => $projet->id,
             'statut' => 'a_faire',
             'avancement' => 0,
             'priorite' => $validated['priorite'] ?? 'moyenne',
@@ -65,9 +67,8 @@ class ActiviteController extends Controller
     public function update(Request $request, $id)
     {
         $activite = Activite::findOrFail($id);
-        $phase = $activite->phase;
         
-        if (!$this->peutGererActivite($request->user(), $phase->id_projet)) {
+        if (!$this->peutGererActivite($request->user(), $activite->id_projet)) {
             return response()->json(['message' => 'Accès non autorisé.'], 403);
         }
 
@@ -79,6 +80,8 @@ class ActiviteController extends Controller
             'priorite' => 'in:basse,moyenne,haute,critique',
             'id_responsable' => 'nullable|exists:utilisateurs,id',
             'statut' => 'in:a_faire,en_cours,bloquee,terminee,annulee',
+            'id_phase' => 'nullable|exists:phases,id',
+            'id_jalon' => 'nullable|exists:jalons,id',
         ]);
 
         $activite->update($validated);
@@ -92,9 +95,8 @@ class ActiviteController extends Controller
     public function destroy(Request $request, $id)
     {
         $activite = Activite::findOrFail($id);
-        $phase = $activite->phase;
         
-        if (!$this->peutGererActivite($request->user(), $phase->id_projet)) {
+        if (!$this->peutGererActivite($request->user(), $activite->id_projet)) {
             return response()->json(['message' => 'Accès non autorisé.'], 403);
         }
         

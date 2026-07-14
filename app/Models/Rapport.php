@@ -47,6 +47,18 @@ class Rapport extends Model
         return $this->belongsTo(Utilisateur::class, 'id_auteur');
     }
 
+    /** Utilisateurs ciblés pour lire ce rapport */
+    public function destinataires()
+    {
+        return $this->belongsToMany(Utilisateur::class, 'rapport_destinataires', 'rapport_id', 'utilisateur_id')->withTimestamps();
+    }
+
+    /** Commentaires laissés sur ce rapport */
+    public function commentaires()
+    {
+        return $this->hasMany(RapportCommentaire::class, 'rapport_id')->orderBy('created_at', 'asc');
+    }
+
     // ─── Résolution polymorphe manuelle ───────────────────────────────────────
 
     /**

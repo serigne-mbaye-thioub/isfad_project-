@@ -2,15 +2,19 @@ import React, { useState, useEffect } from 'react';
 import api from '../axios';
 import { AlertTriangle, Plus } from 'lucide-react';
 
-export const ModalCreateActivite = ({ phases, onClose, onSuccess }) => {
-    const [formData, setFormData] = useState({ id_phase: '', titre: '', description: '', date_debut: '', date_fin: '', priorite: 'moyenne' });
+export const ModalCreateActivite = ({ phases, jalons = [], projetId, onClose, onSuccess }) => {
+    const [formData, setFormData] = useState({ id_phase: '', id_jalon: '', titre: '', description: '', date_debut: '', date_fin: '', priorite: 'moyenne' });
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         try {
-            await api.post(`/api/phases/${formData.id_phase}/activites`, formData);
+            const dataToSubmit = { ...formData };
+            if (!dataToSubmit.id_phase) delete dataToSubmit.id_phase;
+            if (!dataToSubmit.id_jalon) delete dataToSubmit.id_jalon;
+            
+            await api.post(`/api/projets/${projetId}/activites`, dataToSubmit);
             onSuccess();
         } catch (e) {
             alert(e.response?.data?.message || 'Erreur création activité');
@@ -24,10 +28,17 @@ export const ModalCreateActivite = ({ phases, onClose, onSuccess }) => {
             <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">Nouvelle Activité</h3>
                 <div className="space-y-3 mb-6">
-                    <select required className="w-full border rounded-lg p-2 text-sm" value={formData.id_phase} onChange={e => setFormData({...formData, id_phase: e.target.value})}>
-                        <option value="">Sélectionnez une phase...</option>
-                        {phases.map(p => <option key={p.id} value={p.id}>{p.nom}</option>)}
+                    <label className="block text-xs font-bold text-gray-500 mb-1">Rattacher à (Optionnel)</label>
+                    <select className="w-full border rounded-lg p-2 text-sm mb-2" value={formData.id_phase} onChange={e => setFormData({...formData, id_phase: e.target.value})}>
+                        <option value="">-- Aucune phase --</option>
+                        {phases.map(p => <option key={p.id} value={p.id}>{p.titre || p.nom}</option>)}
                     </select>
+                    <select className="w-full border rounded-lg p-2 text-sm" value={formData.id_jalon} onChange={e => setFormData({...formData, id_jalon: e.target.value})}>
+                        <option value="">-- Aucun jalon --</option>
+                        {jalons.map(j => <option key={j.id} value={j.id}>{j.titre}</option>)}
+                    </select>
+                </div>
+                <div className="space-y-3 mb-6">
                     <input type="text" placeholder="Titre de l'activité" required className="w-full border rounded-lg p-2 text-sm" value={formData.titre} onChange={e => setFormData({...formData, titre: e.target.value})} />
                     <textarea placeholder="Description" className="w-full border rounded-lg p-2 text-sm" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
                     <div className="flex gap-2">
@@ -44,7 +55,7 @@ export const ModalCreateActivite = ({ phases, onClose, onSuccess }) => {
     );
 };
 
-export const ModalCreateTache = ({ phases, projetId, membres = [], onClose, onSuccess }) => {
+export const ModalCreateTache = ({ toutesActivites = [], projetId, membres = [], onClose, onSuccess }) => {
     const [formData, setFormData] = useState({
         id_activite: '',
         titre: '',
@@ -67,9 +78,6 @@ export const ModalCreateTache = ({ phases, projetId, membres = [], onClose, onSu
             .catch(err => console.error(err))
             .finally(() => setLoadingUsers(false));
     }, []);
-
-    // Extraction de toutes les activités depuis les phases
-    const toutesActivites = phases.reduce((acc, p) => [...acc, ...(p.activites || [])], []);
 
     const handleCheckboxChange = (type, id) => {
         if (type === 'consultes') {

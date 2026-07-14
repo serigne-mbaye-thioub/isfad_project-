@@ -11,7 +11,7 @@ const DemandesChangement = ({ projetId, currentUser }) => {
 
     const fetchDemandes = async () => {
         try {
-            const res = await api.get(`/api/projets/${projetId}/demandes-changement`);
+            const res = await api.get(`/api/demandes-changements?projet_id=${projetId}`);
             setDemandes(Array.isArray(res.data) ? res.data : (res.data.data || []));
         } catch (e) {
             console.error(e);
@@ -25,7 +25,7 @@ const DemandesChangement = ({ projetId, currentUser }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            await api.post(`/api/projets/${projetId}/demandes-changement`, formData);
+            await api.post('/api/demandes-changements', { ...formData, type_cible: 'projet', id_cible: projetId });
             setShowModal(false);
             setFormData({ titre: '', description: '', impact_delai_jours: '', impact_budget: '', priorite: 'moyenne' });
             fetchDemandes();
@@ -36,7 +36,7 @@ const DemandesChangement = ({ projetId, currentUser }) => {
 
     const handleAction = async (id, statut) => {
         try {
-            await api.patch(`/api/demandes-changement/${id}/statut`, { statut });
+            await api.patch(`/api/demandes-changements/${id}/statut`, { statut });
             fetchDemandes();
         } catch (e) {
             alert('Erreur de validation');

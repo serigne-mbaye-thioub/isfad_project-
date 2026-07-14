@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import api from '../../axios';
 import { Calendar, CheckCircle, Plus, Settings2, Clock, XCircle, GitPullRequest } from 'lucide-react';
 import ModalCreateChangement from './ModalCreateChangement';
+import ModalDecisionChangement from './ModalDecisionChangement';
 
 const Demandes = () => {
     const [demandesChangement, setDemandesChangement] = useState([]);
     const [projets, setProjets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModalChangement, setShowModalChangement] = useState(false);
+    const [decisionDemande, setDecisionDemande] = useState(null);
 
     const currentUser = JSON.parse(localStorage.getItem('auth_user') || '{}');
     const canOrganize = !['Administrateur', 'Administrateur système'].includes(currentUser?.fonction);
@@ -29,10 +31,15 @@ const Demandes = () => {
 
     useEffect(() => { fetchData(); }, []);
 
-    const handleStatutChangement = async (id, statut) => {
+    const handleStatutChangement = async (statut, commentaire) => {
+        if (!decisionDemande) return;
         try {
-            await api.patch(`/api/demandes-changements/${id}/statut`, { statut });
+            await api.patch(`/api/demandes-changements/${decisionDemande.id}/statut`, { 
+                statut, 
+                commentaire_decision: commentaire 
+            });
             fetchData();
+            setDecisionDemande(null);
         } catch (e) {
             alert(e.response?.data?.message || 'Erreur lors de la mise à jour de la demande');
         }
@@ -103,13 +110,22 @@ const Demandes = () => {
                                     </div>
                                 </div>
 
+                                {d.commentaire_decision && (
+                                    <div className={`mb-4 p-3 rounded-xl border ${d.statut === 'refusee' ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'}`}>
+                                        <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${d.statut === 'refusee' ? 'text-red-500' : 'text-emerald-600'}`}>
+                                            Décision du Gestionnaire
+                                        </p>
+                                        <p className="text-sm text-gray-800 whitespace-pre-wrap">{d.commentaire_decision}</p>
+                                    </div>
+                                )}
+
                                 {/* Actions d'approbation (uniquement si autorisé et si statut non final) */}
                                 {d.can_validate && d.statut !== 'acceptee' && d.statut !== 'refusee' && d.statut !== 'annulee' && (
                                     <div className="flex justify-end items-center gap-2 pt-4 border-t border-gray-100 mt-auto">
-                                        <button onClick={() => handleStatutChangement(d.id, 'refusee')} className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition">
+                                        <button onClick={() => setDecisionDemande({id: d.id, statut: 'refusee'})} className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition">
                                             Rejeter
                                         </button>
-                                        <button onClick={() => handleStatutChangement(d.id, 'acceptee')} className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-xs font-bold hover:bg-emerald-600 transition shadow-sm">
+                                        <button onClick={() => setDecisionDemande({id: d.id, statut: 'acceptee'})} className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-xs font-bold hover:bg-emerald-600 transition shadow-sm">
                                             Approuver
                                         </button>
                                     </div>
@@ -122,6 +138,13 @@ const Demandes = () => {
 
             {/* Modales */}
             {showModalChangement && <ModalCreateChangement onClose={() => setShowModalChangement(false)} onSuccess={() => {setShowModalChangement(false); fetchData();}} projets={projets} />}
+            {decisionDemande && (
+                <ModalDecisionChangement 
+                    statut={decisionDemande.statut}
+                    onClose={() => setDecisionDemande(null)}
+                    onConfirm={handleStatutChangement}
+                />
+            )}
         </div>
     );
 };

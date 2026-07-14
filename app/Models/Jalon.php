@@ -51,6 +51,12 @@ class Jalon extends Model
         return $this->belongsTo(Phase::class, 'id_phase');
     }
 
+    /** Les activités rattachées à ce jalon */
+    public function activites(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Activite::class, 'id_jalon');
+    }
+
     // ─── Accesseurs ───────────────────────────────────────────────────────────
 
     /** Indique si le jalon est manqué (échéance dépassée sans être atteint) */

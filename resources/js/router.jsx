@@ -9,6 +9,8 @@ import ProjetDetail from './pages/Projets/ProjetDetail';
 import Demandes from './pages/Demandes/Index';
 import Reunions from './pages/Reunions/Index';
 import Notifications from './pages/Notifications';
+import MesTaches from './pages/MesTaches';
+import AvancementGlobal from './pages/Projets/AvancementGlobal';
 import UtilisateursAdmin from './pages/Admin/UtilisateursAdmin';
 import JournalAudit from './pages/Admin/JournalAudit';
 import Calendrier from './pages/Calendrier/Index';
@@ -45,12 +47,20 @@ const router = createBrowserRouter([
                 element: <Dashboard />,
             },
             {
+                path: 'projets/avancement',
+                element: <AvancementGlobal />,
+            },
+            {
                 path: 'projets',
                 element: <ListeProjets />,
             },
             {
                 path: 'projets/:id',
                 element: <ProjetDetail />,
+            },
+            {
+                path: 'mes-taches',
+                element: <MesTaches />,
             },
             {
                 path: 'demandes',

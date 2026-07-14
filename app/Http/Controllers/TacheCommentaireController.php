@@ -60,6 +60,33 @@ class TacheCommentaireController extends Controller
             'contenu' => $validated['contenu']
         ]);
 
+        // Déterminer le destinataire
+        $destinataireId = null;
+        if ($user->id === $tache->id_responsable && $tache->id_approbateur) {
+            $destinataireId = $tache->id_approbateur;
+        } elseif ($user->id === $tache->id_approbateur) {
+            $destinataireId = $tache->id_responsable;
+        }
+
+        if ($destinataireId) {
+            $idProjetLien = $tache->id_projet ?? $tache->activite?->id_projet ?? $tache->activite?->phase?->id_projet;
+            
+            $notif = \App\Models\Notification::create([
+                'type_evenement' => 'message_tache',
+                'titre' => "Nouveau message sur : {$tache->titre}",
+                'contenu' => "{$user->prenom} {$user->nom} a dit :\n\"{$validated['contenu']}\"",
+                'type_cible' => 'tache',
+                'id_cible' => $tache->id,
+                'id_emetteur' => $user->id,
+            ]);
+
+            \App\Models\NotificationDestinataire::create([
+                'id_notification' => $notif->id,
+                'id_utilisateur' => $destinataireId,
+                'est_lue' => false,
+            ]);
+        }
+
         return response()->json([
             'message' => 'Commentaire ajouté avec succès.',
             'commentaire' => $commentaire->load('auteur:id,nom,prenom,fonction')

@@ -55,7 +55,9 @@ class CalendrierController extends Controller
                   });
             });
         }
-        $taches = $tachesQuery->whereNotNull('date_limite')->get();
+        $taches = $tachesQuery->whereNotNull('date_limite')
+            ->whereNotIn('statut', ['terminee', 'cloture'])
+            ->get();
 
         foreach ($taches as $tache) {
             $projetTitre = $tache->projet ? $tache->projet->titre : ($tache->activite && $tache->activite->phase ? $tache->activite->phase->projet->titre : 'Sans projet');
@@ -82,7 +84,9 @@ class CalendrierController extends Controller
                   });
             });
         }
-        $reunions = $reunionsQuery->whereNotNull('date_reunion')->get();
+        $reunions = $reunionsQuery->whereNotNull('date_reunion')
+            ->where('statut', '!=', 'annulee')
+            ->get();
 
         foreach ($reunions as $reunion) {
             $events[] = [

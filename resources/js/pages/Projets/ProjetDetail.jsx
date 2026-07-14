@@ -3,9 +3,11 @@ import { useParams, Link } from 'react-router-dom';
 import api from '../../axios';
 import { 
     FolderKanban, Users, Calendar, ArrowLeft, 
-    MoreVertical, CheckCircle2, ChevronDown, Plus, LayoutDashboard, Wallet, GitPullRequest, Filter, FileText
+    MoreVertical, CheckCircle2, ChevronDown, Plus, LayoutDashboard, Wallet, GitPullRequest, Filter, FileText,
+    Target, Building, Shield, Flag, Download
 } from 'lucide-react';
 import GestionEquipe from '../../components/GestionEquipe';
+import ModalCreateJalon from '../../components/ModalCreateJalon';
 import KanbanBoard from '../../components/KanbanBoard';
 import { ModalCreateActivite, ModalCreateTache } from '../../components/FormsPlanification';
 import ModalConfirm from '../../components/ModalConfirm';
@@ -65,6 +67,7 @@ const ProjetDetail = () => {
     const [activeTab, setActiveTab] = useState('kanban'); // 'kanban', 'equipe'
     const [currentUser, setCurrentUser] = useState(null);
     const [showPhaseModal, setShowPhaseModal] = useState(false);
+    const [showJalonModal, setShowJalonModal] = useState(false);
     const [showActiviteModal, setShowActiviteModal] = useState(false);
     const [showTacheModal, setShowTacheModal] = useState(false);
     const [filterResponsable, setFilterResponsable] = useState('all');
@@ -91,15 +94,44 @@ const ProjetDetail = () => {
     if (loading) return <div className="p-8 text-center text-gray-500 animate-pulse">Chargement du projet...</div>;
     if (!projet) return <div className="p-8 text-center text-red-500">Projet introuvable.</div>;
 
+    const tousJalons = [
+        ...(projet.jalons || []), 
+        ...(projet.phases?.flatMap(p => p.jalons || []) || [])
+    ];
+    
+    const toutesActivites = [
+        ...(projet.activites || []),
+        ...(projet.jalons?.flatMap(j => j.activites || []) || []),
+        ...(projet.phases?.flatMap(p => [
+            ...(p.activites || []),
+            ...(p.jalons?.flatMap(j => j.activites || []) || [])
+        ]) || [])
+    ];
+
     let toutesTaches = [...(projet.taches || [])];
+    
+    projet.activites?.forEach(a => {
+        const tachesEnrichies = (a.taches || []).map(t => ({ ...t, activite_titre: a.titre }));
+        toutesTaches = [...toutesTaches, ...tachesEnrichies];
+    });
+
+    projet.jalons?.forEach(j => {
+        j.activites?.forEach(a => {
+            const tachesEnrichies = (a.taches || []).map(t => ({ ...t, jalon_titre: j.titre, activite_titre: a.titre }));
+            toutesTaches = [...toutesTaches, ...tachesEnrichies];
+        });
+    });
+
     projet.phases?.forEach(p => {
         p.activites?.forEach(a => {
-            const tachesEnrichies = (a.taches || []).map(t => ({
-                ...t, 
-                phase_titre: p.nom, 
-                activite_titre: a.titre
-            }));
+            const tachesEnrichies = (a.taches || []).map(t => ({ ...t, phase_titre: p.titre || p.nom, activite_titre: a.titre }));
             toutesTaches = [...toutesTaches, ...tachesEnrichies];
+        });
+        p.jalons?.forEach(j => {
+            j.activites?.forEach(a => {
+                const tachesEnrichies = (a.taches || []).map(t => ({ ...t, phase_titre: p.titre || p.nom, jalon_titre: j.titre, activite_titre: a.titre }));
+                toutesTaches = [...toutesTaches, ...tachesEnrichies];
+            });
         });
     });
 
@@ -138,7 +170,7 @@ const ProjetDetail = () => {
                         <h1 className="text-2xl font-extrabold text-gray-900">{projet.titre}</h1>
                         <p className="text-gray-500 text-sm mt-1">{projet.description}</p>
                         
-                        {!projet.transmis_gestionnaire && currentUser?.fonction === 'Chef de projet' && (
+                        {!projet.transmis_gestionnaire && projet.membres?.some(m => m.id === currentUser?.id && m.pivot?.role_projet === 'chef_projet') && (
                             <div className="mt-4">
                                 <button 
                                     onClick={() => setConfirmAction({
@@ -172,7 +204,7 @@ const ProjetDetail = () => {
                                 {projet.statut.replace(/_/g, ' ')}
                             </span>
                         </div>
-                        {projet.statut !== 'annule' && currentUser?.fonction === 'Chef de projet' && (
+                        {projet.statut !== 'annule' && projet.membres?.some(m => m.id === currentUser?.id && m.pivot?.role_projet === 'chef_projet') && (
                             <button 
                                 onClick={() => setConfirmAction({
                                     isOpen: true,
@@ -262,24 +294,114 @@ const ProjetDetail = () => {
             <div className="flex-1 overflow-hidden flex flex-col">
                 {activeTab === 'fiche' ? (
                     <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 overflow-y-auto">
-                        <h2 className="text-lg font-bold text-gray-900 mb-4">Fiche de Projet</h2>
-                        {projet.fiche_projet ? (
-                            <div className="prose prose-sm text-gray-700 max-w-none whitespace-pre-wrap mb-6">
-                                {projet.fiche_projet}
-                            </div>
-                        ) : (
-                            <p className="text-gray-500 italic mb-6">Aucune description textuelle fournie.</p>
-                        )}
+                        <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-100">
+                            <h2 className="text-xl font-extrabold text-gray-900 flex items-center gap-2">
+                                <FolderKanban className="text-[#0564A8]" size={24} /> 
+                                Informations du projet
+                            </h2>
+                        </div>
 
-                        {projet.fiche_fichier && (
-                            <div>
-                                <h3 className="text-sm font-bold text-gray-900 mb-2">Document Joint</h3>
-                                <a href={`/storage/${projet.fiche_fichier}`} target="_blank" rel="noreferrer"
-                                   className="inline-flex items-center gap-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 px-4 py-2 rounded-lg text-sm font-medium text-[#0564A8] transition">
-                                    Voir le document joint
-                                </a>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                            <div className="space-y-6">
+                                <div>
+                                    <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2 mb-2">
+                                        <Target size={16} /> Objectif Principal
+                                    </h3>
+                                    <p className="text-gray-900 font-medium bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                        {projet.objectif || 'Non défini'}
+                                    </p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                        <div className="text-xs font-bold text-gray-400 uppercase mb-1 flex items-center gap-1"><Building size={14} /> Division</div>
+                                        <div className="font-bold text-gray-900">{projet.division || 'Non définie'}</div>
+                                    </div>
+                                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                        <div className="text-xs font-bold text-gray-400 uppercase mb-1 flex items-center gap-1"><Shield size={14} /> État SPSE</div>
+                                        <div className="font-bold text-gray-900 capitalize">{projet.etat_spse || 'Standard'}</div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                        <div className="text-xs font-bold text-[#0564A8]/60 uppercase mb-1 flex items-center gap-1"><Calendar size={14} /> Début</div>
+                                        <div className="font-bold text-[#0564A8]">{projet.date_debut ? new Date(projet.date_debut).toLocaleDateString('fr-FR') : '-'}</div>
+                                    </div>
+                                    <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                                        <div className="text-xs font-bold text-orange-600/60 uppercase mb-1 flex items-center gap-1"><Flag size={14} /> Fin prévue</div>
+                                        <div className="font-bold text-orange-700">{projet.date_fin ? new Date(projet.date_fin).toLocaleDateString('fr-FR') : '-'}</div>
+                                    </div>
+                                </div>
                             </div>
-                        )}
+
+                            <div className="space-y-6">
+                                <div>
+                                    <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2 mb-2">
+                                        <FileText size={16} /> Description & Fiche Technique
+                                    </h3>
+                                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 min-h-[120px]">
+                                        {projet.fiche_projet ? (
+                                            <div className="prose prose-sm text-gray-700 max-w-none whitespace-pre-wrap">
+                                                {projet.fiche_projet}
+                                            </div>
+                                        ) : (
+                                            <p className="text-gray-400 italic flex items-center justify-center h-full">Aucune description textuelle fournie.</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {projet.fiche_fichier && (
+                                    <div className="bg-[#0564A8]/5 p-5 rounded-xl border border-[#0564A8]/10">
+                                        <h3 className="text-sm font-bold text-[#0564A8] flex items-center gap-2 mb-3">
+                                            <Download size={16} /> Document Joint
+                                        </h3>
+                                        <p className="text-xs text-gray-600 mb-4">
+                                            Ce fichier a été joint lors de l'initialisation ou de la transmission du projet.
+                                        </p>
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <a 
+                                                href={`/storage/${projet.fiche_fichier}`} 
+                                                target="_blank" 
+                                                rel="noreferrer"
+                                                className="inline-flex items-center justify-center gap-2 bg-[#0564A8] text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-[#044c80] hover:shadow transition flex-1"
+                                            >
+                                                Ouvrir en plein écran
+                                            </a>
+                                            <a 
+                                                href={`/storage/${projet.fiche_fichier}`} 
+                                                download
+                                                className="inline-flex items-center justify-center gap-2 bg-white text-[#0564A8] border border-[#0564A8] px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-50 transition"
+                                                title="Télécharger directement"
+                                            >
+                                                <Download size={16} />
+                                            </a>
+                                        </div>
+
+                                        {/* Prévisualisation intégrée */}
+                                        <div className="mt-4 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center min-h-[300px]">
+                                            {projet.fiche_fichier.toLowerCase().endsWith('.pdf') ? (
+                                                <iframe 
+                                                    src={`/storage/${projet.fiche_fichier}`} 
+                                                    className="w-full h-[500px]" 
+                                                    title="Prévisualisation du document PDF"
+                                                />
+                                            ) : projet.fiche_fichier.toLowerCase().match(/\.(jpeg|jpg|gif|png)$/) != null ? (
+                                                <img 
+                                                    src={`/storage/${projet.fiche_fichier}`} 
+                                                    alt="Document joint" 
+                                                    className="max-w-full h-auto max-h-[500px] object-contain"
+                                                />
+                                            ) : (
+                                                <div className="p-8 text-center text-gray-500">
+                                                    <FileText size={48} className="mx-auto mb-3 opacity-20" />
+                                                    <p className="text-sm font-medium">Prévisualisation non disponible pour ce type de fichier.</p>
+                                                    <p className="text-xs mt-1">Veuillez télécharger le fichier pour le consulter.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 ) : activeTab === 'equipe' ? (
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 overflow-y-auto">
@@ -357,14 +479,17 @@ const ProjetDetail = () => {
                                 )}
                             </div>
                             <div className="flex gap-2">
-                                <button onClick={() => setShowPhaseModal(true)} className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-gray-200 transition">
-                                    <Plus size={14} /> Phase
+                                <button onClick={() => setShowPhaseModal(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 shadow-sm transition">
+                                    <Plus size={14}/> Phase
                                 </button>
-                                <button onClick={() => setShowActiviteModal(true)} className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-gray-200 transition">
-                                    <Plus size={14} /> Activité
+                                <button onClick={() => setShowJalonModal(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 shadow-sm transition">
+                                    <Plus size={14}/> Jalon
                                 </button>
-                                <button onClick={() => setShowTacheModal(true)} className="bg-[#0564A8] text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-[#044c80] transition">
-                                    <Plus size={14} /> Tâche
+                                <button onClick={() => setShowActiviteModal(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 shadow-sm transition">
+                                    <Plus size={14}/> Activité
+                                </button>
+                                <button onClick={() => setShowTacheModal(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-[#0564A8] rounded-lg hover:bg-[#044c80] shadow-sm transition">
+                                    <Plus size={14}/> Tâche
                                 </button>
                             </div>
                         </div>
@@ -385,11 +510,14 @@ const ProjetDetail = () => {
             {showPhaseModal && (
                 <ModalCreatePhase projetId={projet.id} onClose={() => setShowPhaseModal(false)} onSuccess={() => {setShowPhaseModal(false); fetchProjet();}} />
             )}
+            {showJalonModal && (
+                <ModalCreateJalon phases={projet.phases || []} projetId={projet.id} onClose={() => setShowJalonModal(false)} onCreated={() => {setShowJalonModal(false); fetchProjet();}} />
+            )}
             {showActiviteModal && (
-                <ModalCreateActivite phases={projet.phases || []} onClose={() => setShowActiviteModal(false)} onSuccess={() => {setShowActiviteModal(false); fetchProjet();}} />
+                <ModalCreateActivite phases={projet.phases || []} jalons={tousJalons} projetId={projet.id} onClose={() => setShowActiviteModal(false)} onSuccess={() => {setShowActiviteModal(false); fetchProjet();}} />
             )}
             {showTacheModal && (
-                <ModalCreateTache phases={projet.phases || []} projetId={projet.id} membres={projet.membres || []} onClose={() => setShowTacheModal(false)} onSuccess={() => {setShowTacheModal(false); fetchProjet();}} />
+                <ModalCreateTache toutesActivites={toutesActivites} projetId={projet.id} membres={projet.membres || []} onClose={() => setShowTacheModal(false)} onSuccess={() => {setShowTacheModal(false); fetchProjet();}} />
             )}
 
             <ModalConfirm 

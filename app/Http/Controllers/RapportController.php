@@ -35,15 +35,20 @@ class RapportController extends Controller
             return response()->json(['message' => 'Accès refusé'], 403);
         }
 
-        $query = Rapport::with('auteur:id,nom,prenom,fonction')
+        $query = Rapport::with(['auteur:id,nom,prenom,fonction', 'destinataires:id,nom,prenom,fonction'])
             ->where('type_cible', 'projet')
             ->where('id_cible', $projetId)
             ->orderBy('created_at', 'desc');
 
         // Filtrage de visibilité
         if (!$isGestionnaire && !$isChefProjet) {
-            // Un simple membre ne voit que ses propres rapports
-            $query->where('id_auteur', $user->id);
+            // Un simple membre ne voit que ses propres rapports OU ceux où il est ciblé
+            $query->where(function($q) use ($user) {
+                $q->where('id_auteur', $user->id)
+                  ->orWhereHas('destinataires', function($q2) use ($user) {
+                      $q2->where('utilisateur_id', $user->id);
+                  });
+            });
         }
 
         return response()->json($query->get());
@@ -73,6 +78,9 @@ class RapportController extends Controller
             'type_rapport' => 'required|string|max:100', // Ex: compte_rendu, avancement, anomalie
             'contenu' => 'nullable|string',
             'fichier' => 'nullable|file|max:20480', // Max 20MB
+            'toute_equipe' => 'boolean',
+            'destinataires' => 'nullable|array',
+            'destinataires.*' => 'exists:utilisateurs,id'
         ]);
 
         $url_export = null;
@@ -96,6 +104,34 @@ class RapportController extends Controller
             'est_publie' => true,
         ]);
 
-        return response()->json($rapport->load('auteur'), 201);
+        // Gérer les destinataires
+        $destinatairesIds = [];
+        if (!empty($validated['toute_equipe'])) {
+            $destinatairesIds = \App\Models\ParticipationProjet::where('id_projet', $projetId)
+                ->where('statut', 'actif')
+                ->where('id_utilisateur', '!=', $user->id) // exclure l'auteur lui-même
+                ->pluck('id_utilisateur')
+                ->toArray();
+        } elseif (!empty($validated['destinataires'])) {
+            $destinatairesIds = array_diff($validated['destinataires'], [$user->id]);
+        }
+
+        if (count($destinatairesIds) > 0) {
+            $rapport->destinataires()->sync($destinatairesIds);
+
+            // Notifications
+            foreach ($destinatairesIds as $destId) {
+                \App\Models\Notification::create([
+                    'type_evenement' => 'nouveau_rapport',
+                    'id_cible' => $rapport->id,
+                    'type_cible' => 'rapport',
+                    'message' => $user->prenom . " " . $user->nom . " a partagé un nouveau rapport avec vous : " . $rapport->titre,
+                    'id_destinataire' => $destId,
+                    'id_declencheur' => $user->id,
+                ]);
+            }
+        }
+
+        return response()->json($rapport->load(['auteur', 'destinataires']), 201);
     }
 }

@@ -29,6 +29,7 @@ class DemandeChangement extends Model
         'niveau_approbation',
         'id_demandeur',
         'date_traitement',
+        'commentaire_decision',
     ];
 
     protected function casts(): array

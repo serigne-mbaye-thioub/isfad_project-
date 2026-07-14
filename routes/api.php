@@ -122,8 +122,13 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     Route::put('/phases/{id}', [\App\Http\Controllers\PhaseController::class, 'update']);
     Route::patch('/phases/{id}/statut', [\App\Http\Controllers\PhaseController::class, 'updateStatut']);
 
+    // ── Routes Jalons ──────────────────────────────────────────────────────────
+    Route::post('/projets/{id}/jalons', [\App\Http\Controllers\JalonController::class, 'store']);
+    Route::put('/jalons/{id}', [\App\Http\Controllers\JalonController::class, 'update']);
+    Route::delete('/jalons/{id}', [\App\Http\Controllers\JalonController::class, 'destroy']);
+
     // ── Routes Activités ───────────────────────────────────────────────────────
-    Route::post('/phases/{id}/activites', [\App\Http\Controllers\ActiviteController::class, 'store']);
+    Route::post('/projets/{id}/activites', [\App\Http\Controllers\ActiviteController::class, 'store']);
     Route::put('/activites/{id}', [\App\Http\Controllers\ActiviteController::class, 'update']);
     Route::delete('/activites/{id}', [\App\Http\Controllers\ActiviteController::class, 'destroy']);
 
@@ -132,17 +137,20 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     Route::post('/projets/{id}/budget', [\App\Http\Controllers\BudgetController::class, 'storeOrUpdate']);
 
     // Rapports
-    Route::get('/projets/{id}/rapports', [\App\Http\Controllers\RapportController::class, 'index']);
-    Route::post('/projets/{id}/rapports', [\App\Http\Controllers\RapportController::class, 'store']);
+    Route::get('/projets/{projetId}/rapports', [\App\Http\Controllers\RapportController::class, 'index']);
+    Route::post('/projets/{projetId}/rapports', [\App\Http\Controllers\RapportController::class, 'store']);
+    Route::get('/rapports/{id}/commentaires', [\App\Http\Controllers\RapportCommentaireController::class, 'index']);
+    Route::post('/rapports/{id}/commentaires', [\App\Http\Controllers\RapportCommentaireController::class, 'store']);
     Route::post('/budgets/{id}/depenses', [\App\Http\Controllers\DepenseController::class, 'store']);
     Route::patch('/depenses/{id}/valider', [\App\Http\Controllers\DepenseController::class, 'valider']);
 
     // ── Routes Demandes de Changement ──────────────────────────────────────────
-    Route::get('/projets/{id}/demandes-changement', [\App\Http\Controllers\DemandeChangementController::class, 'index']);
-    Route::post('/projets/{id}/demandes-changement', [\App\Http\Controllers\DemandeChangementController::class, 'store']);
-    Route::patch('/demandes-changement/{id}/statut', [\App\Http\Controllers\DemandeChangementController::class, 'updateStatut']);
+    Route::get('/demandes-changements', [\App\Http\Controllers\DemandeChangementController::class, 'index']);
+    Route::post('/demandes-changements', [\App\Http\Controllers\DemandeChangementController::class, 'store']);
+    Route::patch('/demandes-changements/{id}/statut', [\App\Http\Controllers\DemandeChangementController::class, 'updateStatut']);
 
     // ── Routes Tâches et RACI ──────────────────────────────────────────────────
+    Route::get('/mes-taches', [\App\Http\Controllers\TacheController::class, 'mesTaches']);
     Route::post('/taches', [\App\Http\Controllers\TacheController::class, 'store']);
     Route::put('/taches/{id}', [\App\Http\Controllers\TacheController::class, 'update']);
     Route::patch('/taches/{id}/statut', [\App\Http\Controllers\TacheController::class, 'updateStatut']);

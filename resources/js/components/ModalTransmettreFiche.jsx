@@ -18,14 +18,23 @@ const ModalTransmettreFiche = ({ isOpen, onClose, onSuccess, projet }) => {
 
     useEffect(() => {
         if (isOpen && projet) {
+            let initialChefId = '';
+            try {
+                const user = JSON.parse(localStorage.getItem('auth_user'));
+                if (user && (user.fonction === 'Chef de projet' || user.fonction === 'Architecte de projet' || user.fonction === 'Architecte')) {
+                    // Préremplir avec l'utilisateur connecté s'il gère des projets
+                    initialChefId = user.id;
+                }
+            } catch(e) {}
+
             setFormData({
-                id_chef_projet: '',
+                id_chef_projet: initialChefId,
                 titre: projet.titre || '',
                 objectif: projet.objectif || '',
                 description: projet.description || '',
                 fiche_projet: projet.description || '', // Default rich text is the description
             });
-            fetchUsers();
+            fetchUsers(initialChefId);
         }
     }, [isOpen, projet]);
 

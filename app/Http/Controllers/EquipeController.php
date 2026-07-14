@@ -313,6 +313,7 @@ class EquipeController extends Controller
 
         $utilisateurs = Utilisateur::where('actif', true)
             ->whereNotIn('id', $dejaMembres)
+            ->whereNotIn('fonction', ['Administrateur', 'Administrateur système'])
             ->select('id', 'nom', 'prenom', 'email', 'fonction')
             ->orderBy('nom')
             ->get();

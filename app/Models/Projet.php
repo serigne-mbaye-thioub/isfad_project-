@@ -89,13 +89,19 @@ class Projet extends Model
     /** Jalons du projet */
     public function jalons(): HasMany
     {
-        return $this->hasMany(Jalon::class, 'id_projet');
+        return $this->hasMany(Jalon::class, 'id_projet')->whereNull('id_phase');
     }
 
-    /** Tâches liées directement au projet (sans passer par une activité) */
+    /** Les activités directement liées ou appartenant au projet */
+    public function activites(): HasMany
+    {
+        return $this->hasMany(Activite::class, 'id_projet')->whereNull('id_phase')->whereNull('id_jalon');
+    }
+
+    /** Les tâches orphelines ou globales du projet */
     public function taches(): HasMany
     {
-        return $this->hasMany(Tache::class, 'id_projet');
+        return $this->hasMany(Tache::class, 'id_projet')->whereNull('id_activite');
     }
 
     /** Réunions liées à ce projet */

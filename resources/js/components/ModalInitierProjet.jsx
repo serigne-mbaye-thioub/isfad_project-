@@ -121,10 +121,9 @@ const ModalInitierProjet = ({ isOpen, onClose, onSuccess }) => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Date de fin prévue <span className="text-red-500">*</span></label>
+                                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Date de fin prévue (optionnel)</label>
                                 <input
                                     type="date"
-                                    required
                                     value={formData.date_fin}
                                     onChange={e => setFormData({...formData, date_fin: e.target.value})}
                                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0564A8]/20 focus:border-[#0564A8] transition-all"

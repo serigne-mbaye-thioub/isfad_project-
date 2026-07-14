@@ -9,6 +9,36 @@ use Illuminate\Http\Request;
 class TacheController extends Controller
 {
     /**
+     * Récupère toutes les tâches dont l'utilisateur connecté est le responsable.
+     */
+    public function mesTaches(Request $request)
+    {
+        $user = $request->user();
+        
+        $taches = Tache::with([
+            'projet:id,titre',
+            'activite:id,titre,id_phase,id_jalon,id_projet',
+            'activite.phase:id,nom',
+            'activite.jalon:id,titre',
+            'activite.projet:id,titre',
+            'responsable:id,nom,prenom',
+            'approbateur:id,nom,prenom'
+        ])
+        ->where(function($query) use ($user) {
+            $query->where('id_responsable', $user->id)
+                  ->orWhere('id_approbateur', $user->id)
+                  ->orWhereHas('racis', function($q) use ($user) {
+                      $q->where('id_utilisateur', $user->id);
+                  });
+        })
+        ->whereNotIn('statut', ['archivee']) // On exclut éventuellement les tâches archivées
+        ->orderBy('date_limite', 'asc')
+        ->get();
+
+        return response()->json($taches);
+    }
+
+    /**
      * Vérifie si un utilisateur a le droit de créer/modifier des tâches pour un projet/activité.
      */
     private function peutGererTache($user, $id_projet, $id_activite = null)

@@ -1,46 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import api from '../axios';
-import { Bell, AlertTriangle, CheckCircle, Info, FileText, ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Bell, AlertTriangle, CheckCircle, Info, FileText, ArrowRight, Inbox, Check } from 'lucide-react';
+import { useOutletContext, Link } from 'react-router-dom';
 
 const Notifications = () => {
-    const [notifications, setNotifications] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    const fetchNotifs = async () => {
-        try {
-            const res = await api.get('/api/notifications');
-            setNotifications(Array.isArray(res.data) ? res.data : (res.data.data || []));
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const { notifications, markAsRead, markAllAsRead, fetchNotifs, setNotifications } = useOutletContext();
+    const [loading, setLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState('non_lues');
 
     useEffect(() => {
-        fetchNotifs();
-        const interval = setInterval(fetchNotifs, 60000); // Rafraîchir toutes les minutes
-        return () => clearInterval(interval);
+        if (!notifications.length) {
+            setLoading(true);
+            fetchNotifs().finally(() => setLoading(false));
+        }
     }, []);
-
-    const markAllAsRead = async () => {
-        try {
-            await api.post('/api/notifications/read-all');
-            setNotifications(notifications.map(n => ({ ...n, est_lue: true })));
-        } catch (e) {
-            console.error(e);
-        }
-    };
-
-    const markAsRead = async (id) => {
-        try {
-            await api.patch(`/api/notifications/${id}/read`);
-            setNotifications(notifications.map(n => n.id === id ? { ...n, est_lue: true } : n));
-        } catch (e) {
-            console.error(e);
-        }
-    };
 
     if (loading) return <div className="p-8 text-center animate-pulse text-gray-500">Chargement des notifications...</div>;
 
@@ -61,14 +34,17 @@ const Notifications = () => {
         }
     };
 
+    const nonLuesCount = notifications.filter(n => !n.est_lue).length;
+    const filteredNotifications = notifications.filter(n => activeTab === 'non_lues' ? !n.est_lue : n.est_lue);
+
     return (
         <div className="max-w-5xl mx-auto h-full flex flex-col">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 flex-shrink-0 gap-4 border-b border-gray-100 pb-4">
                 <div>
                     <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Notifications</h1>
-                    <p className="text-gray-500 text-sm mt-1 font-medium">{notifications.length} notification(s)</p>
+                    <p className="text-gray-500 text-sm mt-1 font-medium">{notifications.length} notification(s) au total</p>
                 </div>
-                {notifications.some(n => !n.est_lue) && (
+                {nonLuesCount > 0 && (
                     <button 
                         onClick={markAllAsRead} 
                         className="bg-white border border-[#0564A8] text-[#0564A8] px-4 py-2 rounded-xl text-sm font-bold hover:bg-blue-50 transition shadow-sm"
@@ -78,13 +54,43 @@ const Notifications = () => {
                 )}
             </div>
 
+            {/* Onglets */}
+            <div className="flex gap-4 mb-6 border-b border-gray-200">
+                <button
+                    onClick={() => setActiveTab('non_lues')}
+                    className={`pb-3 px-2 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${
+                        activeTab === 'non_lues' ? 'border-[#0564A8] text-[#0564A8]' : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                >
+                    <Inbox size={16} /> Non lues
+                    {nonLuesCount > 0 && (
+                        <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{nonLuesCount}</span>
+                    )}
+                </button>
+                <button
+                    onClick={() => setActiveTab('lues')}
+                    className={`pb-3 px-2 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${
+                        activeTab === 'lues' ? 'border-[#0564A8] text-[#0564A8]' : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                >
+                    <Check size={16} /> Lues
+                </button>
+            </div>
+
             <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-                {notifications.length === 0 ? (
-                    <div className="p-10 text-center text-gray-400 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                        Aucune notification pour le moment.
+                {filteredNotifications.length === 0 ? (
+                    <div className="p-10 text-center text-gray-400 bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center gap-3">
+                        {activeTab === 'non_lues' ? (
+                            <>
+                                <CheckCircle size={40} className="text-gray-300" />
+                                <p>Vous n'avez aucune nouvelle notification.</p>
+                            </>
+                        ) : (
+                            <p>Aucune notification lue.</p>
+                        )}
                     </div>
                 ) : (
-                    notifications.map(n => {
+                    filteredNotifications.map(n => {
                         const notif = n.notification || {};
                         const type = notif.type_evenement || 'info';
                         const { icon, border } = getIconAndColor(type);
@@ -120,20 +126,38 @@ const Notifications = () => {
                                         </p>
                                         
                                         {/* Action link based on type_cible */}
+                                        {notif.type_cible === 'tache' && notif.id_cible && (
+                                            <Link 
+                                                to={`/mes-taches?tache_id=${notif.id_cible}`}
+                                                className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0564A8] hover:text-[#044c80] hover:underline"
+                                                onClick={() => !n.est_lue && markAsRead(n.id)}
+                                            >
+                                                Voir la tâche <ArrowRight size={14} />
+                                            </Link>
+                                        )}
                                         {notif.type_cible === 'projet' && notif.id_cible && (
                                             <Link 
                                                 to={`/projets/${notif.id_cible}`}
                                                 className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0564A8] hover:text-[#044c80] hover:underline"
-                                                onClick={() => markAsRead(n.id)}
+                                                onClick={() => !n.est_lue && markAsRead(n.id)}
                                             >
                                                 Voir le projet <ArrowRight size={14} />
                                             </Link>
                                         )}
-                                        {notif.type_cible === 'reunion' && notif.id_cible && (
+                                        {notif.type_evenement === 'demande_changement' && (
+                                            <Link 
+                                                to="/demandes"
+                                                className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0564A8] hover:text-[#044c80] hover:underline"
+                                                onClick={() => !n.est_lue && markAsRead(n.id)}
+                                            >
+                                                Voir la demande <ArrowRight size={14} />
+                                            </Link>
+                                        )}
+                                        {notif.type_evenement !== 'demande_changement' && notif.type_cible === 'reunion' && notif.id_cible && (
                                             <Link 
                                                 to={`/reunions#${notif.type_evenement === 'reunion' ? 'demande-' : 'reunion-'}${notif.id_cible}`}
                                                 className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0564A8] hover:text-[#044c80] hover:underline"
-                                                onClick={() => markAsRead(n.id)}
+                                                onClick={() => !n.est_lue && markAsRead(n.id)}
                                             >
                                                 Voir la réunion <ArrowRight size={14} />
                                             </Link>

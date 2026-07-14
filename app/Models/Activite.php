@@ -20,7 +20,9 @@ class Activite extends Model
     protected $table = 'activites';
 
     protected $fillable = [
+        'id_projet',
         'id_phase',
+        'id_jalon',
         'titre',
         'description',
         'date_debut',
@@ -48,6 +50,22 @@ class Activite extends Model
         return $this->belongsTo(Phase::class, 'id_phase');
     }
 
+    /**
+     * Le jalon parent de l'activité (optionnel).
+     */
+    public function jalon(): BelongsTo
+    {
+        return $this->belongsTo(Jalon::class, 'id_jalon');
+    }
+
+    /**
+     * Le projet global auquel l'activité appartient.
+     */
+    public function projet(): BelongsTo
+    {
+        return $this->belongsTo(Projet::class, 'id_projet');
+    }
+
     /** Responsable de l'activité (peut être NULL) */
     public function responsable(): BelongsTo
     {
@@ -61,10 +79,4 @@ class Activite extends Model
     }
 
     // ─── Raccourcis ───────────────────────────────────────────────────────────
-
-    /** Projet parent (via la phase) */
-    public function projet()
-    {
-        return $this->phase->projet;
-    }
 }

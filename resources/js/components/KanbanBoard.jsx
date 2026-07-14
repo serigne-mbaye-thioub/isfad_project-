@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Clock, CheckCircle2, AlertTriangle, AlertCircle, PlayCircle } from 'lucide-react';
 import api from '../axios';
+import ModalAlert from './ModalAlert';
 import ModalDetailTache from './ModalDetailTache';
 
 const STATUSES = [
@@ -57,11 +58,23 @@ const KanbanTask = ({ task, onClick, onStatutChange, currentUser }) => {
             </div>
 
             <h4 className="text-sm font-bold text-gray-900 leading-tight mb-1.5 line-clamp-2">{task.titre}</h4>
-            {(task.phase_titre || task.activite_titre || task.activite?.phase?.titre) && (
-                <div className="text-[10px] text-gray-500 mb-3 leading-tight">
-                    {task.phase_titre || task.activite?.phase?.titre || 'Sans phase'} 
-                    <span className="mx-1 text-gray-300">›</span> 
-                    {task.activite_titre || task.activite?.titre || 'Générale'}
+            {(task.phase_titre || task.jalon_titre || task.activite_titre || task.activite?.phase?.titre || task.activite?.jalon?.titre) && (
+                <div className="text-[10px] text-gray-500 mb-3 leading-tight flex flex-wrap items-center gap-1">
+                    {(task.phase_titre || task.activite?.phase?.titre) && (
+                        <>
+                            <span>{task.phase_titre || task.activite?.phase?.titre}</span>
+                            <span className="text-gray-300">›</span>
+                        </>
+                    )}
+                    {(task.jalon_titre || task.activite?.jalon?.titre) && (
+                        <>
+                            <span className="text-[#0564A8] font-medium">{task.jalon_titre || task.activite?.jalon?.titre}</span>
+                            <span className="text-gray-300">›</span>
+                        </>
+                    )}
+                    {(task.activite_titre || task.activite?.titre) && (
+                        <span>{task.activite_titre || task.activite?.titre}</span>
+                    )}
                 </div>
             )}
 
@@ -92,7 +105,7 @@ const KanbanTask = ({ task, onClick, onStatutChange, currentUser }) => {
 const KanbanColumn = ({ status, tasks, onTaskClick, onStatutChange, currentUser }) => {
     return (
         <div 
-            className="flex flex-col bg-gray-50/50 rounded-2xl border border-gray-100 w-[300px] flex-shrink-0"
+            className="flex flex-col bg-gray-50/50 rounded-2xl border border-gray-100 w-[300px] flex-shrink-0 max-h-full"
             onDragOver={(e) => {
                 e.preventDefault();
                 e.currentTarget.classList.add('bg-blue-50/50', 'border-blue-200');
@@ -144,19 +157,26 @@ const KanbanColumn = ({ status, tasks, onTaskClick, onStatutChange, currentUser 
 
 const KanbanBoard = ({ taches = [], onTaskUpdate, currentUser, membres = [] }) => {
     const [selectedTask, setSelectedTask] = useState(null);
+    const [alertMessage, setAlertMessage] = useState('');
 
     const handleStatutChange = async (taskId, newStatut) => {
         try {
             await api.patch(`/api/taches/${taskId}/statut`, { statut: newStatut });
             onTaskUpdate(); // Rafraîchir les données parentes
         } catch (e) {
-            alert(e.response?.data?.message || 'Erreur lors du changement de statut');
+            setAlertMessage(e.response?.data?.message || 'Erreur lors du changement de statut');
         }
     };
 
     return (
         <>
-            <div className="flex gap-6 overflow-x-auto pb-4 pt-2 -mx-2 px-2 items-start">
+            <ModalAlert 
+                isOpen={!!alertMessage}
+                title="Accès refusé"
+                message={alertMessage}
+                onClose={() => setAlertMessage('')}
+            />
+            <div className="flex gap-6 overflow-x-auto pb-4 pt-2 -mx-2 px-2 items-start h-full w-full">
                 {STATUSES.map(status => {
                     const columnTasks = taches.filter(t => t.statut === status.id);
                     return (

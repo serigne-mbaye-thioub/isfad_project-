@@ -51,7 +51,7 @@ class Phase extends Model
     /** Activités contenues dans cette phase */
     public function activites(): HasMany
     {
-        return $this->hasMany(Activite::class, 'id_phase');
+        return $this->hasMany(Activite::class, 'id_phase')->whereNull('id_jalon');
     }
 
     /** Jalons rattachés à cette phase (relation optionnelle) */

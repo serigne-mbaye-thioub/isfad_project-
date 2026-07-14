@@ -32,16 +32,24 @@ class ProjetController extends Controller
                   });
             });
         } elseif ($user->fonction === 'Architecte' || $user->fonction === 'Architecte de projet') {
-            $query->where('id_createur', $user->id)->where('statut', '!=', 'archive');
+            $query->where('id_createur', $user->id)->whereNotIn('statut', ['archive', 'annule']);
         } else {
             $query->where(function($q) use ($user) {
                 $q->whereHas('participations', function($sq) use ($user) {
                     $sq->where('id_utilisateur', $user->id)->where('statut', 'actif');
                 })->orWhere('id_createur', $user->id);
-            })->where('statut', '!=', 'archive');
+            })->whereNotIn('statut', ['archive', 'annule']);
         }
 
-        $projets = $query->get();
+        $projets = $query->orderByRaw("
+            CASE priorite 
+                WHEN 'critique' THEN 1 
+                WHEN 'haute' THEN 2 
+                WHEN 'moyenne' THEN 3 
+                WHEN 'basse' THEN 4 
+                ELSE 5 
+            END
+        ")->orderBy('created_at', 'desc')->get();
 
         return response()->json($projets);
     }
@@ -61,11 +69,14 @@ class ProjetController extends Controller
         $validated = $request->validate([
             'titre' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'fiche_projet' => 'nullable|url',
+            'fiche_projet' => 'nullable|string',
             'fichier' => 'nullable|file|mimes:pdf,doc,docx|max:10240', // 10MB max
             'date_debut' => 'required|date',
-            'date_fin' => 'required|date|after_or_equal:date_debut',
+            'date_fin' => 'nullable|date|after_or_equal:date_debut',
             'priorite' => 'nullable|in:basse,moyenne,haute,critique',
+            'equipe' => 'nullable|array',
+            'equipe.*.id_utilisateur' => 'required_with:equipe|exists:utilisateurs,id',
+            'equipe.*.role_projet' => 'required_with:equipe|string|in:partenaire,architecte,chef_projet,superviseur,gestionnaire,admin,membre',
             'id_chef_projet' => 'required|exists:utilisateurs,id',
             'create_kickoff' => 'nullable|boolean',
             'reunion_date' => 'nullable|required_if:create_kickoff,true|date',
@@ -89,9 +100,10 @@ class ProjetController extends Controller
                 'description' => $validated['description'] ?? null,
                 'fiche_projet' => $validated['fiche_projet'] ?? null,
                 'date_debut' => $validated['date_debut'],
-                'date_fin' => $validated['date_fin'],
+                'date_fin' => $validated['date_fin'] ?? null,
                 'priorite' => $validated['priorite'] ?? 'moyenne',
-                'statut' => 'a_demarrer',
+                'statut' => 'en_cours',
+                'transmis_gestionnaire' => true,
             ]);
             if ($path) {
                 $projet->update(['fiche_fichier' => $path]);
@@ -103,12 +115,12 @@ class ProjetController extends Controller
                 'fiche_projet' => $validated['fiche_projet'] ?? null,
                 'fiche_fichier' => $path,
                 'date_debut' => $validated['date_debut'],
-                'date_fin' => $validated['date_fin'],
+                'date_fin' => $validated['date_fin'] ?? null,
                 'priorite' => $validated['priorite'] ?? 'moyenne',
-                'statut' => 'a_demarrer',
+                'statut' => 'en_cours',
                 'avancement' => 0,
                 'id_createur' => $user->id,
-                'transmis_gestionnaire' => false,
+                'transmis_gestionnaire' => true,
             ]);
         }
 
@@ -140,6 +152,20 @@ class ProjetController extends Controller
             ['id_projet' => $projet->id, 'id_utilisateur' => $validated['id_chef_projet']],
             ['role_projet' => 'chef_projet', 'statut' => 'actif', 'date_affectation' => now()]
         );
+
+        // Ajout des membres de l'équipe (s'il y en a)
+        if (!empty($validated['equipe'])) {
+            foreach ($validated['equipe'] as $membre) {
+                // On évite d'écraser le chef de projet
+                if ($membre['id_utilisateur'] == $validated['id_chef_projet']) {
+                    continue;
+                }
+                ParticipationProjet::updateOrCreate(
+                    ['id_projet' => $projet->id, 'id_utilisateur' => $membre['id_utilisateur']],
+                    ['role_projet' => $membre['role_projet'], 'statut' => 'actif', 'date_affectation' => now()]
+                );
+            }
+        }
 
         // --- GESTION DE LA RÉUNION DE DÉMARRAGE ---
         if (!empty($validated['create_kickoff']) && $validated['create_kickoff']) {
@@ -246,7 +272,7 @@ class ProjetController extends Controller
             'division' => 'required|string',
             'partenaire' => 'nullable|string',
             'date_debut' => 'required|date',
-            'date_fin' => 'required|date|after_or_equal:date_debut',
+            'date_fin' => 'nullable|date|after_or_equal:date_debut',
             'priorite' => 'required|in:basse,moyenne,haute,critique',
         ]);
 
@@ -276,12 +302,16 @@ class ProjetController extends Controller
         $projet = Projet::findOrFail($id);
         $user = $request->user();
 
-        if ($user->fonction !== 'Architecte' && $user->fonction !== 'Architecte de projet') {
-            return response()->json(['message' => 'Seul un Architecte peut transmettre une fiche projet.'], 403);
-        }
-
         if ($projet->id_createur !== $user->id || $projet->statut !== 'initie') {
-            return response()->json(['message' => 'Vous ne pouvez transmettre que vos projets initiés.'], 403);
+            $msg = 'Vous ne pouvez transmettre que vos projets initiés.';
+            Notification::create([
+                'type_evenement' => 'alerte',
+                'titre' => 'Échec de transmission',
+                'contenu' => $msg,
+                'type_cible' => 'projet',
+                'id_cible' => $projet->id,
+            ])->destinataires()->create(['id_utilisateur' => $user->id]);
+            return response()->json(['message' => $msg], 403);
         }
 
         $validated = $request->validate([
@@ -295,7 +325,15 @@ class ProjetController extends Controller
 
         $chef = \App\Models\Utilisateur::find($validated['id_chef_projet']);
         if ($chef && strtolower($chef->fonction) !== 'chef de projet') {
-            return response()->json(['message' => 'L\'utilisateur assigné doit avoir la fonction "Chef de projet".'], 422);
+            $msg = 'L\'utilisateur assigné doit avoir la fonction "Chef de projet".';
+            Notification::create([
+                'type_evenement' => 'alerte',
+                'titre' => 'Échec de transmission',
+                'contenu' => $msg,
+                'type_cible' => 'projet',
+                'id_cible' => $projet->id,
+            ])->destinataires()->create(['id_utilisateur' => $user->id]);
+            return response()->json(['message' => $msg], 422);
         }
 
         $updateData = [
@@ -325,7 +363,7 @@ class ProjetController extends Controller
             'date_affectation' => now(),
         ]);
 
-        // Notification
+        // Notification au Chef de projet
         Notification::create([
             'type_evenement' => 'projet_transmis',
             'titre' => 'Nouveau projet transmis',
@@ -334,6 +372,16 @@ class ProjetController extends Controller
             'id_cible' => $projet->id,
             'id_emetteur' => $user->id,
         ])->destinataires()->create(['id_utilisateur' => $validated['id_chef_projet']]);
+
+        // Notification de succès pour l'Architecte (lui-même)
+        Notification::create([
+            'type_evenement' => 'succes',
+            'titre' => 'Transmission réussie',
+            'contenu' => 'Le projet ' . $projet->titre . ' a été transmis avec succès au chef de projet.',
+            'type_cible' => 'projet',
+            'id_cible' => $projet->id,
+            'id_emetteur' => null,
+        ])->destinataires()->create(['id_utilisateur' => $user->id]);
 
         return response()->json($projet);
     }
@@ -346,9 +394,19 @@ class ProjetController extends Controller
         $projet = Projet::with([
             'createur:id,nom,prenom,email,fonction',
             'membres:id,nom,prenom,email,fonction',
+            'phases',
             'taches.responsable:id,nom,prenom',
             'taches.approbateur:id,nom,prenom',
             'taches.racis.utilisateur:id,nom,prenom',
+            'activites.taches.responsable:id,nom,prenom',
+            'activites.taches.approbateur:id,nom,prenom',
+            'activites.taches.racis.utilisateur:id,nom,prenom',
+            'jalons.activites.taches.responsable:id,nom,prenom',
+            'jalons.activites.taches.approbateur:id,nom,prenom',
+            'jalons.activites.taches.racis.utilisateur:id,nom,prenom',
+            'phases.jalons.activites.taches.responsable:id,nom,prenom',
+            'phases.jalons.activites.taches.approbateur:id,nom,prenom',
+            'phases.jalons.activites.taches.racis.utilisateur:id,nom,prenom',
             'phases.activites.taches.responsable:id,nom,prenom',
             'phases.activites.taches.approbateur:id,nom,prenom',
             'phases.activites.taches.racis.utilisateur:id,nom,prenom',
@@ -370,29 +428,46 @@ class ProjetController extends Controller
             return response()->json(['message' => 'Accès non autorisé à ce projet.'], 403);
         }
 
-        if ($projet->statut === 'archive' && !$hasGlobalAccess) {
-            return response()->json(['message' => 'Ce projet est archivé. Seul le Gestionnaire peut y accéder.'], 403);
+        if (in_array($projet->statut, ['archive', 'annule']) && !$hasGlobalAccess) {
+            $statusLabel = $projet->statut === 'archive' ? 'archivé' : 'annulé';
+            return response()->json(['message' => "Ce projet est $statusLabel. Seul le Gestionnaire peut y accéder."], 403);
         }
 
         // Si c'est juste un membre normal (pas chef, ni gestionnaire, ni admin),
         // on ne lui renvoie que les tâches où il est impliqué (R ou dans RACI).
         if (!$isChefOrMore && !$isCreateur) {
-            if ($projet->taches) {
-                $projet->setRelation('taches', $projet->taches->filter(function($tache) use ($user) {
+            $filterTaches = function($taches) use ($user) {
+                return $taches->filter(function($tache) use ($user) {
                     return $tache->id_responsable === $user->id || 
                            $tache->id_approbateur === $user->id ||
                            $tache->racis->contains('id_utilisateur', $user->id);
-                })->values());
-            }
+                })->values();
+            };
 
+            if ($projet->taches) {
+                $projet->setRelation('taches', $filterTaches($projet->taches));
+            }
+            if ($projet->activites) {
+                foreach ($projet->activites as $activite) {
+                    $activite->setRelation('taches', $filterTaches($activite->taches));
+                }
+            }
+            if ($projet->jalons) {
+                foreach ($projet->jalons as $jalon) {
+                    foreach ($jalon->activites as $activite) {
+                        $activite->setRelation('taches', $filterTaches($activite->taches));
+                    }
+                }
+            }
             if ($projet->phases) {
                 foreach ($projet->phases as $phase) {
                     foreach ($phase->activites as $activite) {
-                        $activite->setRelation('taches', $activite->taches->filter(function($tache) use ($user) {
-                            return $tache->id_responsable === $user->id || 
-                                   $tache->id_approbateur === $user->id ||
-                                   $tache->racis->contains('id_utilisateur', $user->id);
-                        })->values());
+                        $activite->setRelation('taches', $filterTaches($activite->taches));
+                    }
+                    foreach ($phase->jalons as $jalon) {
+                        foreach ($jalon->activites as $activite) {
+                            $activite->setRelation('taches', $filterTaches($activite->taches));
+                        }
                     }
                 }
             }
@@ -504,7 +579,7 @@ class ProjetController extends Controller
             'division' => 'nullable|string',
             'description' => 'nullable|string',
             'date_debut' => 'date',
-            'date_fin' => 'date|after_or_equal:date_debut',
+            'date_fin' => 'nullable|date|after_or_equal:date_debut',
             'priorite' => 'in:basse,moyenne,haute,critique',
             'statut' => 'in:initie,transmis_chef,a_demarrer,en_cours,suspendu,cloture,annule,archive',
         ]);

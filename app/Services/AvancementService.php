@@ -18,10 +18,14 @@ class AvancementService
             if ($activite) {
                 $this->recalculerActivite($activite);
                 
-                $phase = Phase::find($activite->id_phase);
-                if ($phase) {
-                    $this->recalculerPhase($phase);
-                    $this->recalculerProjet(Projet::find($phase->id_projet));
+                if ($activite->id_phase) {
+                    $phase = Phase::find($activite->id_phase);
+                    if ($phase) {
+                        $this->recalculerPhase($phase);
+                        $this->recalculerProjet(Projet::find($phase->id_projet));
+                    }
+                } else {
+                    $this->recalculerProjet(Projet::find($activite->id_projet));
                 }
             }
         } elseif ($id_projet) {
@@ -40,7 +44,7 @@ class AvancementService
             return;
         }
 
-        $terminees = $activite->taches()->where('statut', 'terminee')->count();
+        $terminees = $activite->taches()->whereIn('statut', ['terminee', 'archivee'])->count();
         $pourcentage = ($terminees / $total) * 100;
         
         $activite->update(['avancement' => $pourcentage]);
@@ -48,52 +52,53 @@ class AvancementService
 
     private function recalculerPhase(Phase $phase)
     {
-        $total = $phase->activites()->count();
+        $activites = Activite::where('id_phase', $phase->id)->get();
+        $total = $activites->count();
         if ($total === 0) {
             $phase->update(['avancement' => 0]);
             return;
         }
 
-        // On fait la moyenne des avancements des activités
-        $pourcentage = $phase->activites()->avg('avancement');
-        
+        $pourcentage = $activites->avg('avancement');
         $phase->update(['avancement' => $pourcentage]);
     }
 
     private function recalculerProjet(Projet $projet)
     {
-        // Un projet peut avoir des phases ET/OU des tâches directes.
-        $totalPhases = $projet->phases()->count();
-        $totalTaches = $projet->taches()->count();
+        if (!$projet) return;
 
-        if ($totalPhases === 0 && $totalTaches === 0) {
+        $totalPhases = $projet->phases()->count();
+        $totalActivitesDirectes = Activite::where('id_projet', $projet->id)->whereNull('id_phase')->count();
+        $totalTachesDirectes = $projet->taches()->count();
+
+        $totalPoids = $totalPhases + $totalActivitesDirectes + $totalTachesDirectes;
+
+        if ($totalPoids === 0) {
             $projet->update(['avancement' => 0]);
             return;
         }
 
-        $sommePhases = 0;
+        $somme = 0;
         if ($totalPhases > 0) {
-            $sommePhases = $projet->phases()->avg('avancement') * $totalPhases;
+            $somme += $projet->phases()->sum('avancement');
+        }
+        if ($totalActivitesDirectes > 0) {
+            $somme += Activite::where('id_projet', $projet->id)->whereNull('id_phase')->sum('avancement');
+        }
+        if ($totalTachesDirectes > 0) {
+            $terminees = $projet->taches()->whereIn('statut', ['terminee', 'archivee'])->count();
+            $somme += $terminees * 100;
         }
 
-        $sommeTaches = 0;
-        if ($totalTaches > 0) {
-            $tachesTerminees = $projet->taches()->where('statut', 'terminee')->count();
-            // L'avancement des tâches directes
-            $avancementTaches = ($tachesTerminees / $totalTaches) * 100;
-            $sommeTaches = $avancementTaches * $totalTaches; // on pondère
-        }
-
-        // Moyenne globale pondérée par le nombre d'éléments de premier niveau (phases + taches directes)
-        $pourcentage = ($sommePhases + $sommeTaches) / ($totalPhases + $totalTaches);
+        $pourcentage = $somme / $totalPoids;
 
         $dataToUpdate = ['avancement' => $pourcentage];
         
         // Changement automatique de statut selon l'avancement
         if ($pourcentage > 0 && $pourcentage < 100 && $projet->statut === 'a_demarrer') {
             $dataToUpdate['statut'] = 'en_cours';
-        } elseif ($pourcentage == 100 && $projet->statut !== 'termine' && $projet->statut !== 'archive') {
-            $dataToUpdate['statut'] = 'termine';
+        } elseif ($pourcentage == 100 && $projet->statut !== 'cloture' && $projet->statut !== 'archive') {
+            $dataToUpdate['statut'] = 'cloture';
         }
 
         $projet->update($dataToUpdate);

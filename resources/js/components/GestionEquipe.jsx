@@ -3,17 +3,18 @@ import api from '../axios';
 import {
     Users, UserPlus, UserMinus, Crown, ChevronDown,
     AlertTriangle, Loader2, RefreshCw, Shield, Briefcase,
-    CheckCircle2, X
+    CheckCircle2, X, Star, Eye, Activity
 } from 'lucide-react';
 
 // ── Constantes ──────────────────────────────────────────────────────────────
 const ROLES = [
-    { value: 'chef_projet',  label: 'Chef de projet',  icon: <Crown size={14} />,     color: 'text-yellow-600 bg-yellow-50 border-yellow-200' },
-    { value: 'gestionnaire', label: 'Gestionnaire',     icon: <Shield size={14} />,    color: 'text-blue-600 bg-blue-50 border-blue-200' },
-    { value: 'architecte',   label: 'Architecte',       icon: <Briefcase size={14} />, color: 'text-purple-600 bg-purple-50 border-purple-200' },
-    { value: 'superviseur',  label: 'Superviseur',      icon: <Shield size={14} />,    color: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
-    { value: 'membre',       label: 'Membre d\'équipe', icon: <Users size={14} />,     color: 'text-gray-600 bg-gray-50 border-gray-200' },
+    { value: 'membre',       label: "Membre d'équipe",  icon: <Users size={14} />,     color: 'text-gray-600 bg-gray-50 border-gray-200' },
     { value: 'partenaire',   label: 'Partenaire',       icon: <Users size={14} />,     color: 'text-green-600 bg-green-50 border-green-200' },
+    { value: 'architecte',   label: 'Architecte de projet', icon: <Shield size={14} />,   color: 'text-purple-600 bg-purple-50 border-purple-200' },
+    { value: 'chef_projet',  label: 'Chef de projet',   icon: <Star size={14} />,      color: 'text-amber-600 bg-amber-50 border-amber-200' },
+    { value: 'superviseur',  label: 'Superviseur',      icon: <Eye size={14} />,       color: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
+    { value: 'gestionnaire', label: 'Gestionnaire de projet', icon: <Activity size={14} />, color: 'text-[#0564A8] bg-blue-50 border-blue-200' },
+    { value: 'admin',        label: 'Admin',            icon: <Shield size={14} />,    color: 'text-red-600 bg-red-50 border-red-200' },
 ];
 
 const getRoleInfo = (value) => ROLES.find(r => r.value === value) || { label: value, color: 'text-gray-600 bg-gray-50 border-gray-200', icon: null };

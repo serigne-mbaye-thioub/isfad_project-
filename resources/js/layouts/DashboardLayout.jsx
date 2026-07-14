@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, FolderKanban, Calendar, Bell, LogOut, ChevronDown, Shield, FileText, Wallet, Inbox, Video, Sparkles, Settings, User, HelpCircle, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Users, FolderKanban, Calendar, Bell, LogOut, ChevronDown, Shield, FileText, Wallet, Inbox, Video, Sparkles, Settings, User, HelpCircle, ChevronRight, ListTodo } from 'lucide-react';
 import api from '../axios';
 
 const DashboardLayout = () => {
@@ -26,6 +26,16 @@ const DashboardLayout = () => {
     const [notifications, setNotifications] = useState([]);
     const [showNotifs, setShowNotifs] = useState(false);
     
+    // Nouveaux états pour le grand popup global
+    const [showGlobalPopup, setShowGlobalPopup] = useState(false);
+    const [dismissedNotifIds, setDismissedNotifIds] = useState(() => {
+        try {
+            return JSON.parse(sessionStorage.getItem('dismissed_notifs')) || [];
+        } catch {
+            return [];
+        }
+    });
+    
     // État pour le menu de profil
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const profileMenuRef = useRef(null);
@@ -41,13 +51,25 @@ const DashboardLayout = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    const fetchNotifs = async () => {
+        try {
+            const res = await api.get('/api/notifications');
+            const notifs = Array.isArray(res.data) ? res.data : (res.data.data || []);
+            setNotifications(notifs);
+            
+            // Vérifier s'il y a des notifications non lues et non acquittées
+            const unreadNotifs = notifs.filter(n => !n.est_lue);
+            let currentDismissed = [];
+            try { currentDismissed = JSON.parse(sessionStorage.getItem('dismissed_notifs')) || []; } catch {}
+            
+            const hasNew = unreadNotifs.some(n => !currentDismissed.includes(n.id));
+            if (hasNew) {
+                setShowGlobalPopup(true);
+            }
+        } catch (e) { console.error(e); }
+    };
+
     useEffect(() => {
-        const fetchNotifs = async () => {
-            try {
-                const res = await api.get('/api/notifications');
-                setNotifications(Array.isArray(res.data) ? res.data : (res.data.data || []));
-            } catch (e) { console.error(e); }
-        };
         fetchNotifs();
         const interval = setInterval(fetchNotifs, 60000); // Rafraîchir toutes les minutes
         return () => clearInterval(interval);
@@ -66,17 +88,27 @@ const DashboardLayout = () => {
         try {
             await api.post('/api/notifications/read-all');
             setNotifications(notifications.map(n => ({ ...n, est_lue: true })));
+            setShowGlobalPopup(false);
         } catch (e) {}
+    };
+
+    const handleCloseGlobalPopup = () => {
+        setShowGlobalPopup(false);
+        const unreadIds = notifications.filter(n => !n.est_lue).map(n => n.id);
+        const newDismissed = [...new Set([...dismissedNotifIds, ...unreadIds])];
+        setDismissedNotifIds(newDismissed);
+        sessionStorage.setItem('dismissed_notifs', JSON.stringify(newDismissed));
     };
 
     const handleLogout = async () => {
         try {
             await api.post('/api/logout');
         } catch (e) {
-            // On efface de toute façon
+            console.error(e);
         } finally {
             localStorage.removeItem('auth_token');
             localStorage.removeItem('auth_user');
+            sessionStorage.removeItem('dismissed_notifs');
             navigate('/login');
         }
     };
@@ -86,6 +118,7 @@ const DashboardLayout = () => {
     const navItems = [
         { to: '/dashboard', icon: <LayoutDashboard size={17} />, label: 'Tableau de bord' },
         { to: '/projets', icon: <FolderKanban size={17} />, label: 'Projets' },
+        { to: '/mes-taches', icon: <ListTodo size={17} />, label: 'Mes Tâches' },
         { to: '/reunions', icon: <Video size={17} />, label: 'Réunions' },
         { to: '/demandes', icon: <Inbox size={17} />, label: 'Demandes' },
         { to: '/calendrier', icon: <Calendar size={17} />, label: 'Calendrier' },
@@ -103,7 +136,7 @@ const DashboardLayout = () => {
                 {/* Logo */}
                 <div className="px-4 py-5 border-b border-white/5 flex justify-center">
                     <Link to="/dashboard" className="bg-white rounded-xl p-2 shadow-lg inline-block hover:scale-105 transition-transform cursor-pointer">
-                        <img src="/images/logo_isfad.png" alt="Logo ISFAD UCAD" className="h-12 w-auto object-contain" />
+                        <img src="/images/logo_isfad.jpeg" alt="Logo ISFAD UCAD" className="h-12 w-auto object-contain" />
                     </Link>
                 </div>
 
@@ -281,9 +314,63 @@ const DashboardLayout = () => {
 
                 {/* Zone de contenu */}
                 <main className="flex-1 overflow-y-auto bg-[#f0f4f8] p-8">
-                    <Outlet />
+                    <Outlet context={{ notifications, markAsRead, markAllAsRead, fetchNotifs, setNotifications }} />
                 </main>
             </div>
+
+            {/* GRAND POPUP DE NOTIFICATION GLOBAL */}
+            {showGlobalPopup && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200">
+                        <div className="bg-[#0564A8] p-5 text-center relative">
+                            <div className="mx-auto bg-white/20 w-12 h-12 rounded-full flex items-center justify-center mb-2">
+                                <Bell size={24} className="text-white" />
+                            </div>
+                            <h2 className="text-xl font-bold text-white">Vous avez de nouvelles notifications !</h2>
+                            <button onClick={handleCloseGlobalPopup} className="absolute top-4 right-4 text-white/70 hover:text-white transition bg-white/10 hover:bg-white/20 rounded-full p-1.5">
+                                <LogOut size={18} className="rotate-180" />
+                            </button>
+                        </div>
+                        
+                        <div className="p-6 overflow-y-auto flex-1">
+                            <div className="space-y-4">
+                                {notifications.filter(n => !n.est_lue).slice(0, 5).map(notif => (
+                                    <div key={notif.id} className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 flex gap-4 items-start">
+                                        <div className="bg-blue-100 p-2 rounded-lg text-[#0564A8] mt-1">
+                                            {notif.notification?.type_evenement === 'reunion' ? <Video size={18} /> : <Sparkles size={18} />}
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-gray-900 text-sm">{notif.notification?.titre}</p>
+                                            <p className="text-xs text-gray-600 mt-1 leading-relaxed">{notif.notification?.contenu}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                                {unreadCount > 5 && (
+                                    <p className="text-center text-sm font-medium text-gray-500 mt-2">
+                                        Et {unreadCount - 5} autre(s) notification(s)...
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="p-5 border-t border-gray-100 bg-gray-50 flex gap-3 justify-end">
+                            <button 
+                                onClick={handleCloseGlobalPopup}
+                                className="px-5 py-2 text-gray-600 font-medium hover:bg-gray-200 rounded-xl transition text-sm"
+                            >
+                                Plus tard
+                            </button>
+                            <Link 
+                                to="/notifications" 
+                                onClick={handleCloseGlobalPopup}
+                                className="px-5 py-2 bg-[#0564A8] text-white font-bold rounded-xl hover:bg-[#044c80] transition shadow-sm text-sm"
+                            >
+                                Voir toutes les notifications
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

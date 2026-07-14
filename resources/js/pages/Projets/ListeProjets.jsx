@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../axios';
 import { 
     FolderKanban, Plus, Search, Calendar, ChevronRight, 
-    MoreVertical, Activity, AlertTriangle, PlayCircle, CheckCircle2, FileText 
+    MoreVertical, Activity, AlertTriangle, PlayCircle, CheckCircle2, FileText, Users, LogOut, ArrowRight 
 } from 'lucide-react';
 import ModalInitierProjet from '../../components/ModalInitierProjet';
 import ModalTransmettreFiche from '../../components/ModalTransmettreFiche';
+import ModalConfirm from '../../components/ModalConfirm';
 
-const ProjetCard = ({ projet, onClick, onEdit, onTransmettre, onCreer, currentUser }) => {
+const ProjetCard = ({ projet, onClick, onEdit, onTransmettre, onTransmettreGestionnaire, onCreer, currentUser, onStatusChange }) => {
     const avancement = parseFloat(projet.avancement) || 0;
     const progressColor = avancement === 100 ? 'bg-emerald-500' : 'bg-[#0564A8]';
     
@@ -30,9 +31,10 @@ const ProjetCard = ({ projet, onClick, onEdit, onTransmettre, onCreer, currentUs
     const isInitie = projet.statut === 'initie';
     const isTransmis = projet.statut === 'transmis_chef';
     const isArchive = projet.statut === 'archive';
+    const isAnnule = projet.statut === 'annule';
 
     return (
-        <div className={`rounded-2xl shadow-sm border hover:shadow-md transition-all duration-300 w-full mb-4 ${isArchive ? 'bg-gray-100 opacity-70 border-gray-200' : 'bg-white border-gray-100'}`}>
+        <div className={`rounded-2xl shadow-sm border hover:shadow-md transition-all duration-300 w-full mb-4 ${isArchive ? 'bg-gray-100 opacity-70 border-gray-200' : isAnnule ? 'bg-red-50/40 border-red-200 opacity-80' : 'bg-white border-gray-100'}`}>
             <div className="p-6 pb-5">
                 {/* Ligne 1: Titre et Boutons */}
                 <div className="flex justify-between items-start mb-3">
@@ -45,9 +47,14 @@ const ProjetCard = ({ projet, onClick, onEdit, onTransmettre, onCreer, currentUs
                                 Transmettre
                             </button>
                         )}
+                        {isTransmis && currentUser?.fonction === 'Chef de projet' && !projet.transmis_gestionnaire && (
+                            <button onClick={(e) => { e.stopPropagation(); onTransmettreGestionnaire(projet); }} className="px-5 py-2 bg-emerald-500 text-white font-bold text-sm rounded-xl hover:bg-emerald-600 transition-colors shadow-sm">
+                                Transmettre au gestionnaire
+                            </button>
+                        )}
                         {isTransmis && (currentUser?.fonction === 'Chef de projet' || (projet.transmis_gestionnaire && ['Gestionnaire', 'Gestionnaire de projet', 'Administrateur', 'Administrateur système'].includes(currentUser?.fonction))) && (
                             <button onClick={(e) => { e.stopPropagation(); onCreer(projet); }} className="px-5 py-2 bg-[#0564A8] text-white font-bold text-sm rounded-xl hover:bg-[#044c80] transition-colors shadow-sm">
-                                Créer le projet
+                                Démarrer le projet
                             </button>
                         )}
                         {!isInitie && !isTransmis && (() => {
@@ -79,9 +86,36 @@ const ProjetCard = ({ projet, onClick, onEdit, onTransmettre, onCreer, currentUs
                     )}
                     <div className="flex items-center gap-1.5 text-xs font-bold">
                         <span className={`w-2 h-2 rounded-full ${isSuccess ? 'bg-emerald-500' : (isWarning ? 'bg-amber-500' : 'bg-[#0564A8]')}`}></span>
-                        <span className={isSuccess ? 'text-emerald-600' : (isWarning ? 'text-amber-600' : 'text-[#0564A8]')}>
-                            {getStatutLabel(projet.statut)}
-                        </span>
+                        {(() => {
+                            const participation = projet.membres?.find(m => m.id === currentUser?.id);
+                            const canChangeStatus = ['Chef de projet', 'Gestionnaire', 'Gestionnaire de projet'].includes(currentUser?.fonction) || 
+                                                  (participation && ['chef_projet', 'gestionnaire'].includes(participation.role_projet));
+                            
+                            if (canChangeStatus) {
+                                return (
+                                    <select
+                                        value={projet.statut}
+                                        onChange={(e) => { e.stopPropagation(); onStatusChange(projet.id, e.target.value); }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className={`bg-transparent border-none py-0 pl-0 pr-6 cursor-pointer focus:ring-0 text-xs font-bold outline-none shadow-none ${isSuccess ? 'text-emerald-600' : (isWarning ? 'text-amber-600' : (isAnnule ? 'text-red-600' : 'text-[#0564A8]'))}`}
+                                    >
+                                        <option value="initie" className="text-gray-900">Initié</option>
+                                        <option value="transmis_chef" className="text-gray-900">Transmis au Chef</option>
+                                        <option value="a_demarrer" className="text-gray-900">À démarrer</option>
+                                        <option value="en_cours" className="text-gray-900">En cours</option>
+                                        <option value="suspendu" className="text-gray-900">En pause</option>
+                                        <option value="cloture" className="text-gray-900">Terminé</option>
+                                        <option value="annule" className="text-gray-900">Annulé</option>
+                                        {projet.statut === 'archive' && <option value="archive" className="text-gray-900">Archivé</option>}
+                                    </select>
+                                );
+                            }
+                            return (
+                                <span className={isSuccess ? 'text-emerald-600' : (isWarning ? 'text-amber-600' : (isAnnule ? 'text-red-600' : 'text-[#0564A8]'))}>
+                                    {getStatutLabel(projet.statut)}
+                                </span>
+                            );
+                        })()}
                     </div>
                 </div>
 
@@ -106,7 +140,7 @@ const ProjetCard = ({ projet, onClick, onEdit, onTransmettre, onCreer, currentUs
                     <span className="flex items-center gap-1">
                         {new Date(projet.date_debut).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })} 
                         <ChevronRight size={10} className="text-gray-400" /> 
-                        {new Date(projet.date_fin).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {projet.date_fin ? new Date(projet.date_fin).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Non définie'}
                     </span>
                 </div>
             </div>
@@ -213,8 +247,8 @@ const ModalEditProjet = ({ projet, onClose, onSuccess }) => {
                                     className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm font-medium" />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wider">Fin prévue <span className="text-red-500">*</span></label>
-                                <input type="date" required value={formData.date_fin} onChange={e => setFormData({...formData, date_fin: e.target.value})}
+                                <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wider">Fin prévue (optionnel)</label>
+                                <input type="date" value={formData.date_fin} onChange={e => setFormData({...formData, date_fin: e.target.value})}
                                     className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm font-medium" />
                             </div>
                         </div>
@@ -237,11 +271,11 @@ const ModalEditProjet = ({ projet, onClose, onSuccess }) => {
     );
 };
 
-// Modale de création simplifiée (réutilisée pour '+ Nouveau projet')
+// Modale de création / démarrage
 const ModalCreateProjet = ({ onClose, onSuccess, currentUser, initialProjet }) => {
-    // ... [Reste du code ModalCreateProjet identique ou simplifié, je l'omets ici pour me concentrer sur l'édition] ...
-    // Pour ne pas casser le code existant, je restaure le ModalCreateProjet précédent :
     const defaultChefProjet = currentUser?.fonction === 'Chef de projet' ? currentUser.id : '';
+    const isFromInitie = !!initialProjet;
+
     const [formData, setFormData] = useState({
         titre: initialProjet?.titre || '', 
         description: initialProjet?.description || '', 
@@ -250,13 +284,17 @@ const ModalCreateProjet = ({ onClose, onSuccess, currentUser, initialProjet }) =
         priorite: initialProjet?.priorite || 'moyenne',
         fiche_projet: initialProjet?.fiche_projet || '', 
         id_chef_projet: defaultChefProjet,
-        id_projet_initial: initialProjet?.id || null // Pour lier lors de la création
+        id_projet_initial: initialProjet?.id || null
     });
     
+    // Toggle Sections
     const [includeKickoff, setIncludeKickoff] = useState(false);
     const [kickoffData, setKickoffData] = useState({
         reunion_date: '', reunion_heure: '', reunion_lieu: '', reunion_duree: 60, participants: []
     });
+
+    const [includeEquipe, setIncludeEquipe] = useState(false);
+    const [equipeData, setEquipeData] = useState([]); // Array of { id_utilisateur, role_projet }
 
     const [fichier, setFichier] = useState(null);
     const [utilisateurs, setUtilisateurs] = useState([]);
@@ -271,7 +309,6 @@ const ModalCreateProjet = ({ onClose, onSuccess, currentUser, initialProjet }) =
         e.preventDefault();
         if (!formData.id_chef_projet) { setError("Veuillez désigner un Chef de projet."); return; }
         
-        // Validation réunion
         if (includeKickoff) {
             if (!kickoffData.reunion_date || !kickoffData.reunion_heure) {
                 setError("Veuillez renseigner la date et l'heure de la réunion de démarrage.");
@@ -285,7 +322,6 @@ const ModalCreateProjet = ({ onClose, onSuccess, currentUser, initialProjet }) =
             Object.keys(formData).forEach(key => data.append(key, formData[key]));
             if (fichier) data.append('fichier', fichier);
             
-            // Ajout des données de réunion
             if (includeKickoff) {
                 data.append('create_kickoff', 1);
                 data.append('reunion_date', kickoffData.reunion_date);
@@ -295,148 +331,254 @@ const ModalCreateProjet = ({ onClose, onSuccess, currentUser, initialProjet }) =
                 kickoffData.participants.forEach(pId => data.append('participants_reunion[]', pId));
             }
 
+            if (includeEquipe && equipeData.length > 0) {
+                equipeData.forEach((membre, index) => {
+                    data.append(`equipe[${index}][id_utilisateur]`, membre.id_utilisateur);
+                    data.append(`equipe[${index}][role_projet]`, membre.role_projet);
+                });
+            }
+
             await api.post('/api/projets', data, { headers: { 'Content-Type': 'multipart/form-data' } });
             onSuccess();
         } catch (err) {
-            setError(err.response?.data?.message || 'Erreur de création.');
+            setError(err.response?.data?.message || 'Erreur lors du démarrage du projet.');
         } finally {
             setLoading(false);
         }
     };
 
+    const rolesDisponibles = [
+        { value: 'membre', label: "Membre d'équipe" },
+        { value: 'partenaire', label: "Partenaire" },
+        { value: 'architecte', label: "Architecte de projet" },
+        { value: 'chef_projet', label: "Chef de projet" },
+        { value: 'superviseur', label: "Superviseur" },
+        { value: 'gestionnaire', label: "Gestionnaire de projet" },
+        { value: 'admin', label: "Admin" }
+    ];
+
+    const addMembre = (userId) => {
+        if (!equipeData.find(m => m.id_utilisateur === userId)) {
+            setEquipeData([...equipeData, { id_utilisateur: userId, role_projet: 'membre' }]);
+        }
+    };
+
+    const removeMembre = (userId) => {
+        setEquipeData(equipeData.filter(m => m.id_utilisateur !== userId));
+    };
+
+    const updateMembreRole = (userId, newRole) => {
+        setEquipeData(equipeData.map(m => m.id_utilisateur === userId ? { ...m, role_projet: newRole } : m));
+    };
+
     return (
-        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl border border-gray-100 flex flex-col max-h-[90vh] overflow-hidden">
-                <div className="bg-gradient-to-r from-[#0564A8] to-[#043d7a] px-8 py-6 text-white relative flex-shrink-0">
-                    <h3 className="text-xl font-extrabold flex items-center gap-2 relative z-10"><FolderKanban size={24} /> Nouveau Projet</h3>
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
+        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-[#f8fafc] rounded-3xl shadow-2xl w-full max-w-4xl border border-gray-100 flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="bg-gradient-to-r from-[#0564A8] to-[#043d7a] px-8 py-6 text-white relative flex-shrink-0 shadow-md">
+                    <h3 className="text-xl font-extrabold flex items-center gap-3 relative z-10">
+                        <PlayCircle size={28} className="text-blue-200" /> 
+                        {isFromInitie ? 'Démarrer le Projet' : 'Créer un Nouveau Projet'}
+                    </h3>
+                    <p className="text-blue-100 text-sm mt-1 opacity-90 relative z-10">
+                        Configurez les paramètres finaux, la réunion et l'équipe.
+                    </p>
+                    <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl"></div>
                 </div>
-                <div className="overflow-y-auto custom-scrollbar">
-                    <form onSubmit={handleSubmit} className="p-8">
-                    {error && <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm mb-6 flex gap-2 items-center"><AlertTriangle size={16} /> {error}</div>}
-                    <div className="space-y-5 mb-8">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Titre <span className="text-red-500">*</span></label>
-                            <input type="text" required value={formData.titre} onChange={e => setFormData({...formData, titre: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all font-medium text-gray-900" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Chef de projet <span className="text-red-500">*</span></label>
-                            <select required value={formData.id_chef_projet} onChange={e => setFormData({...formData, id_chef_projet: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm">
-                                <option value="">-- Sélectionner --</option>
-                                {utilisateurs.map(u => <option key={u.id} value={u.id}>{u.prenom} {u.nom} ({u.fonction})</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Description / Fiche du projet</label>
-                            <textarea rows="3" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm resize-none"></textarea>
-                        </div>
-                        {initialProjet?.fiche_fichier && (
-                            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-3">
-                                <FileText size={20} className="text-[#0564A8]" />
-                                <div>
-                                    <p className="text-sm font-bold text-blue-900 mb-1">Document joint par l'Architecte</p>
-                                    <a href={`/storage/${initialProjet.fiche_fichier}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-[#0564A8] hover:underline">
-                                        Voir le document
-                                    </a>
-                                </div>
-                            </div>
-                        )}
-                        <div className="grid grid-cols-2 gap-5">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Début <span className="text-red-500">*</span></label>
-                                <input type="date" required value={formData.date_debut} onChange={e => setFormData({...formData, date_debut: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Fin prévue <span className="text-red-500">*</span></label>
-                                <input type="date" required value={formData.date_fin} onChange={e => setFormData({...formData, date_fin: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* --- OPTION RÉUNION DE DÉMARRAGE --- */}
-                    <div className="mb-8 border border-blue-100 rounded-xl overflow-hidden">
-                        <div 
-                            className={`p-4 flex items-center justify-between cursor-pointer transition ${includeKickoff ? 'bg-blue-50' : 'bg-gray-50 hover:bg-gray-100'}`}
-                            onClick={() => setIncludeKickoff(!includeKickoff)}
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${includeKickoff ? 'bg-[#0564A8] text-white' : 'bg-gray-200 text-gray-500'}`}>
-                                    <Calendar size={16} />
-                                </div>
-                                <div>
-                                    <h4 className={`text-sm font-bold ${includeKickoff ? 'text-[#0564A8]' : 'text-gray-700'}`}>Planifier la réunion de démarrage</h4>
-                                    <p className="text-[11px] text-gray-500">Optionnel : Créer automatiquement le Kickoff meeting</p>
-                                </div>
-                            </div>
-                            <div className={`w-10 h-5 rounded-full relative transition-colors ${includeKickoff ? 'bg-[#0564A8]' : 'bg-gray-300'}`}>
-                                <div className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-all ${includeKickoff ? 'left-6' : 'left-1'}`}></div>
-                            </div>
-                        </div>
-
-                        {includeKickoff && (
-                            <div className="p-5 border-t border-blue-100 bg-white space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
+                
+                <div className="overflow-y-auto custom-scrollbar flex-1 p-8">
+                    <form id="demarrer-projet-form" onSubmit={handleSubmit}>
+                        {error && <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-xl text-sm mb-6 flex gap-2 items-center"><AlertTriangle size={16} /> {error}</div>}
+                        
+                        {/* SECTION 1: INFOS DU PROJET */}
+                        <div className="mb-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                            <h4 className="text-sm font-extrabold text-gray-900 uppercase tracking-wider flex items-center gap-2 mb-5">
+                                <span className="bg-blue-100 text-[#0564A8] w-6 h-6 flex items-center justify-center rounded-full text-xs">1</span> 
+                                Informations Générales
+                            </h4>
+                            <div className="space-y-5">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     <div>
-                                        <label className="block text-[11px] font-bold text-gray-600 mb-1.5 uppercase">Date <span className="text-red-500">*</span></label>
-                                        <input type="date" required value={kickoffData.reunion_date} onChange={e => setKickoffData({...kickoffData, reunion_date: e.target.value})} className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm" />
+                                        <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase">Titre <span className="text-red-500">*</span></label>
+                                        <input type="text" required value={formData.titre} readOnly={isFromInitie} onChange={e => setFormData({...formData, titre: e.target.value})} className={`w-full px-4 py-3 rounded-xl border text-sm font-medium ${isFromInitie ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gray-50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] text-gray-900'}`} />
                                     </div>
                                     <div>
-                                        <label className="block text-[11px] font-bold text-gray-600 mb-1.5 uppercase">Heure <span className="text-red-500">*</span></label>
-                                        <input type="time" required value={kickoffData.reunion_heure} onChange={e => setKickoffData({...kickoffData, reunion_heure: e.target.value})} className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm" />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-gray-600 mb-1.5 uppercase">Durée (minutes)</label>
-                                        <select value={kickoffData.reunion_duree} onChange={e => setKickoffData({...kickoffData, reunion_duree: e.target.value})} className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm">
-                                            <option value="15">15 min</option>
-                                            <option value="30">30 min</option>
-                                            <option value="45">45 min</option>
-                                            <option value="60">1h</option>
-                                            <option value="90">1h 30</option>
-                                            <option value="120">2h</option>
+                                        <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase">Chef de projet <span className="text-red-500">*</span></label>
+                                        <select required value={formData.id_chef_projet} onChange={e => setFormData({...formData, id_chef_projet: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm font-medium text-gray-900">
+                                            <option value="">-- Sélectionner --</option>
+                                            {utilisateurs.map(u => <option key={u.id} value={u.id}>{u.prenom} {u.nom} ({u.fonction})</option>)}
                                         </select>
                                     </div>
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-gray-600 mb-1.5 uppercase">Lieu / Lien visio</label>
-                                        <input type="text" placeholder="Ex: Salle 2, Lien Zoom..." value={kickoffData.reunion_lieu} onChange={e => setKickoffData({...kickoffData, reunion_lieu: e.target.value})} className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm" />
-                                    </div>
                                 </div>
+                                
                                 <div>
-                                    <label className="block text-[11px] font-bold text-gray-600 mb-1.5 uppercase">Inviter d'autres membres (Optionnel)</label>
-                                    <div className="h-32 overflow-y-auto border border-gray-200 rounded-lg bg-gray-50 p-2 space-y-1">
-                                        {utilisateurs.filter(u => u.id !== currentUser.id && u.id != formData.id_chef_projet).map(u => {
-                                            const isChecked = kickoffData.participants.includes(u.id);
-                                            return (
-                                                <label key={u.id} className="flex items-center gap-2 p-1 hover:bg-white rounded cursor-pointer transition">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        checked={isChecked}
-                                                        onChange={() => {
-                                                            const newParticipants = isChecked 
-                                                                ? kickoffData.participants.filter(id => id !== u.id)
-                                                                : [...kickoffData.participants, u.id];
-                                                            setKickoffData({...kickoffData, participants: newParticipants});
-                                                        }}
-                                                        className="w-4 h-4 text-[#0564A8] rounded border-gray-300 focus:ring-[#0564A8]"
-                                                    />
-                                                    <span className="text-xs font-medium text-gray-700">{u.prenom} {u.nom} ({u.fonction})</span>
-                                                </label>
-                                            );
-                                        })}
+                                    <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase">Description</label>
+                                    <textarea rows="2" value={formData.description} readOnly={isFromInitie} onChange={e => setFormData({...formData, description: e.target.value})} className={`w-full px-4 py-3 rounded-xl border text-sm resize-none ${isFromInitie ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gray-50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] text-gray-900'}`}></textarea>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-5">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase">Date de début <span className="text-red-500">*</span></label>
+                                        <input type="date" required value={formData.date_debut} readOnly={isFromInitie} onChange={e => setFormData({...formData, date_debut: e.target.value})} className={`w-full px-4 py-3 rounded-xl border text-sm ${isFromInitie ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gray-50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] text-gray-900'}`} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase">Date de fin prévue <span className="text-gray-400 font-normal lowercase">(Optionnel)</span></label>
+                                        <input type="date" value={formData.date_fin} onChange={e => setFormData({...formData, date_fin: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm text-gray-900" />
                                     </div>
                                 </div>
                             </div>
-                        )}
-                    </div>
+                        </div>
 
-                    <div className="flex items-center gap-3">
-                        <button type="button" onClick={onClose} className="flex-1 py-3.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all">Annuler</button>
-                        <button type="submit" disabled={loading} className="flex-[2] py-3.5 rounded-xl bg-[#0564A8] hover:bg-[#2897E8] text-white text-sm font-bold transition-all shadow-lg shadow-blue-200 flex justify-center items-center gap-2">
-                            {loading ? 'Création...' : 'Créer le projet'}
-                        </button>
-                    </div>
-                </form>
+                        {/* SECTION 2: RÉUNION DE DÉMARRAGE */}
+                        <div className="mb-6 bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
+                            <div 
+                                className={`p-5 flex items-center justify-between cursor-pointer transition ${includeKickoff ? 'bg-[#f4f8fb]' : 'hover:bg-gray-50'}`}
+                                onClick={() => setIncludeKickoff(!includeKickoff)}
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${includeKickoff ? 'bg-[#0564A8] text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>
+                                        <Calendar size={18} />
+                                    </div>
+                                    <div>
+                                        <h4 className={`text-sm font-extrabold uppercase tracking-wide ${includeKickoff ? 'text-[#0564A8]' : 'text-gray-700'}`}>
+                                            <span className="bg-blue-100 text-[#0564A8] w-5 h-5 inline-flex items-center justify-center rounded-full text-[10px] mr-2">2</span> 
+                                            Organiser le Kick-off Meeting
+                                        </h4>
+                                        <p className="text-xs text-gray-500 mt-0.5">Planifiez immédiatement la réunion de lancement du projet.</p>
+                                    </div>
+                                </div>
+                                <div className={`w-12 h-6 rounded-full relative transition-colors ${includeKickoff ? 'bg-[#0564A8]' : 'bg-gray-300'}`}>
+                                    <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm ${includeKickoff ? 'left-7' : 'left-1'}`}></div>
+                                </div>
+                            </div>
+
+                            {includeKickoff && (
+                                <div className="p-6 border-t border-blue-100 bg-[#fbfdff] space-y-5 animate-in slide-in-from-top-2 duration-200">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        <div>
+                                            <label className="block text-[11px] font-bold text-gray-500 mb-1.5 uppercase">Date <span className="text-red-500">*</span></label>
+                                            <input type="date" required value={kickoffData.reunion_date} onChange={e => setKickoffData({...kickoffData, reunion_date: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[11px] font-bold text-gray-500 mb-1.5 uppercase">Heure <span className="text-red-500">*</span></label>
+                                            <input type="time" required value={kickoffData.reunion_heure} onChange={e => setKickoffData({...kickoffData, reunion_heure: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        <div>
+                                            <label className="block text-[11px] font-bold text-gray-500 mb-1.5 uppercase">Lieu / Lien visio</label>
+                                            <input type="text" placeholder="Ex: Salle de réunion A..." value={kickoffData.reunion_lieu} onChange={e => setKickoffData({...kickoffData, reunion_lieu: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[11px] font-bold text-gray-500 mb-1.5 uppercase">Durée prévue</label>
+                                            <select value={kickoffData.reunion_duree} onChange={e => setKickoffData({...kickoffData, reunion_duree: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-[#0564A8]/30 focus:border-[#0564A8] transition-all text-sm">
+                                                <option value="30">30 min</option>
+                                                <option value="60">1 heure</option>
+                                                <option value="90">1h 30</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* SECTION 3: ÉQUIPE DU PROJET */}
+                        <div className="mb-6 bg-white rounded-2xl shadow-sm border border-emerald-100 overflow-hidden">
+                            <div 
+                                className={`p-5 flex items-center justify-between cursor-pointer transition ${includeEquipe ? 'bg-[#f4fbf7]' : 'hover:bg-gray-50'}`}
+                                onClick={() => setIncludeEquipe(!includeEquipe)}
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${includeEquipe ? 'bg-emerald-500 text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>
+                                        <Users size={18} />
+                                    </div>
+                                    <div>
+                                        <h4 className={`text-sm font-extrabold uppercase tracking-wide ${includeEquipe ? 'text-emerald-700' : 'text-gray-700'}`}>
+                                            <span className={`w-5 h-5 inline-flex items-center justify-center rounded-full text-[10px] mr-2 ${includeEquipe ? 'bg-emerald-200 text-emerald-800' : 'bg-gray-200 text-gray-600'}`}>3</span> 
+                                            Constituer l'Équipe
+                                        </h4>
+                                        <p className="text-xs text-gray-500 mt-0.5">Ajoutez immédiatement des membres et assignez leurs rôles.</p>
+                                    </div>
+                                </div>
+                                <div className={`w-12 h-6 rounded-full relative transition-colors ${includeEquipe ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                                    <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm ${includeEquipe ? 'left-7' : 'left-1'}`}></div>
+                                </div>
+                            </div>
+
+                            {includeEquipe && (
+                                <div className="p-6 border-t border-emerald-100 bg-[#fbfdfc] animate-in slide-in-from-top-2 duration-200 flex flex-col md:flex-row gap-8">
+                                    {/* Liste des utilisateurs disponibles */}
+                                    <div className="flex-1">
+                                        <label className="block text-[11px] font-bold text-gray-500 mb-2 uppercase">Utilisateurs disponibles</label>
+                                        <div className="h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl p-2 space-y-1 custom-scrollbar">
+                                            {utilisateurs.filter(u => u.id !== currentUser.id && u.id != formData.id_chef_projet && !equipeData.find(m => m.id_utilisateur === u.id)).map(u => (
+                                                <div key={u.id} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded-lg group">
+                                                    <div>
+                                                        <p className="text-sm font-bold text-gray-900">{u.prenom} {u.nom}</p>
+                                                        <p className="text-[10px] text-gray-500">{u.fonction}</p>
+                                                    </div>
+                                                    <button type="button" onClick={() => addMembre(u.id)} className="bg-emerald-50 text-emerald-600 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-100">
+                                                        <Plus size={16} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            {utilisateurs.filter(u => u.id !== currentUser.id && u.id != formData.id_chef_projet && !equipeData.find(m => m.id_utilisateur === u.id)).length === 0 && (
+                                                <p className="text-center text-xs text-gray-400 p-4">Tous les utilisateurs sont sélectionnés.</p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Membres sélectionnés et rôles */}
+                                    <div className="flex-[1.5]">
+                                        <label className="block text-[11px] font-bold text-emerald-600 mb-2 uppercase">Équipe Sélectionnée ({equipeData.length})</label>
+                                        <div className="h-48 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                                            {equipeData.length === 0 ? (
+                                                <div className="h-full flex items-center justify-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 text-gray-400 text-xs font-medium">
+                                                    Cliquez sur le + pour ajouter un membre
+                                                </div>
+                                            ) : (
+                                                equipeData.map(membre => {
+                                                    const u = utilisateurs.find(u => u.id === membre.id_utilisateur);
+                                                    if (!u) return null;
+                                                    return (
+                                                        <div key={u.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-emerald-100 shadow-sm animate-in slide-in-from-left-2 duration-150">
+                                                            <div>
+                                                                <p className="text-sm font-bold text-gray-900">{u.prenom} {u.nom}</p>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <select 
+                                                                    value={membre.role_projet}
+                                                                    onChange={(e) => updateMembreRole(u.id, e.target.value)}
+                                                                    className="text-xs py-1.5 px-2 bg-gray-50 border-gray-200 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 font-medium"
+                                                                >
+                                                                    {rolesDisponibles.map(r => (
+                                                                        <option key={r.value} value={r.value}>{r.label}</option>
+                                                                    ))}
+                                                                </select>
+                                                                <button type="button" onClick={() => removeMembre(u.id)} className="text-red-400 hover:text-red-600 p-1 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+                                                                    <LogOut size={14} className="rotate-180" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                    </form>
+                </div>
+                
+                <div className="p-6 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-3 flex-shrink-0 rounded-b-3xl">
+                    <button type="button" onClick={onClose} className="px-6 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-white transition-all">
+                        Annuler
+                    </button>
+                    <button form="demarrer-projet-form" type="submit" disabled={loading} className="px-8 py-2.5 rounded-xl bg-[#0564A8] hover:bg-[#044c80] text-white text-sm font-bold transition-all shadow-md shadow-blue-900/20 flex items-center gap-2">
+                        {loading ? 'Démarrage...' : (isFromInitie ? 'Démarrer le projet' : 'Créer le projet')}
+                        <ArrowRight size={16} />
+                    </button>
                 </div>
             </div>
         </div>
@@ -451,6 +593,7 @@ const ListeProjets = () => {
     
     // Nouvel état pour la modale d'édition
     const [editingProjet, setEditingProjet] = useState(null);
+    const [confirmAction, setConfirmAction] = useState({ isOpen: false });
     
     const navigate = useNavigate();
 
@@ -463,10 +606,11 @@ const ListeProjets = () => {
         setLoading(true);
         try {
             const res = await api.get('/api/projets');
-            // Tri: projets archivés en bas, puis du plus récent au plus ancien
+            // Tri: projets archivés et annulés en bas, puis du plus récent au plus ancien
             const sorted = res.data.sort((a, b) => {
-                if (a.statut === 'archive' && b.statut !== 'archive') return 1;
-                if (a.statut !== 'archive' && b.statut === 'archive') return -1;
+                const weightA = a.statut === 'archive' ? 2 : (a.statut === 'annule' ? 1 : 0);
+                const weightB = b.statut === 'archive' ? 2 : (b.statut === 'annule' ? 1 : 0);
+                if (weightA !== weightB) return weightA - weightB;
                 return new Date(b.created_at) - new Date(a.created_at);
             });
             setProjets(sorted);
@@ -478,6 +622,16 @@ const ListeProjets = () => {
     };
 
     useEffect(() => { fetchProjets(); }, []);
+
+    const handleStatusChange = async (id, newStatut) => {
+        try {
+            await api.put(`/api/projets/${id}`, { statut: newStatut });
+            fetchProjets();
+        } catch (error) {
+            console.error(error);
+            alert(error.response?.data?.message || 'Erreur lors de la modification du statut');
+        }
+    };
 
     const normalizeText = (text) => 
         text ? text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : '';
@@ -503,6 +657,23 @@ const ListeProjets = () => {
     const handleCreer = (projet) => {
         setCreatingProjet(projet);
         setShowCreateModal(true);
+    };
+
+    const handleTransmettreGestionnaire = (projet) => {
+        setConfirmAction({
+            isOpen: true,
+            title: 'Transmettre au gestionnaire',
+            message: 'Êtes-vous sûr de vouloir transmettre ce projet au gestionnaire ? Une fois transmis, il pourra être validé et démarrer.',
+            type: 'primary',
+            onConfirm: async () => {
+                try {
+                    await api.post(`/api/projets/${projet.id}/transmettre`);
+                    fetchProjets();
+                } catch (err) {
+                    alert(err.response?.data?.message || 'Erreur lors de la transmission');
+                }
+            }
+        });
     };
 
     return (
@@ -587,7 +758,9 @@ const ListeProjets = () => {
                             onClick={(id) => navigate(`/projets/${id}`)} 
                             onEdit={(p) => setEditingProjet(p)}
                             onTransmettre={handleTransmettre}
+                            onTransmettreGestionnaire={handleTransmettreGestionnaire}
                             onCreer={handleCreer}
+                            onStatusChange={handleStatusChange}
                         />
                     ))}
                 </div>
@@ -647,6 +820,12 @@ const ListeProjets = () => {
                     }}
                 />
             )}
+
+            {/* Modal de confirmation globale */}
+            <ModalConfirm 
+                {...confirmAction} 
+                onClose={() => setConfirmAction({ ...confirmAction, isOpen: false })} 
+            />
         </div>
     );
 };
