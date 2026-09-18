@@ -307,7 +307,7 @@ const Dashboard = () => {
         color: STATUT_COLORS[formatStatutName(item.statut)] || '#64748b'
     })) || [];
     
-    const totalDonut = stats.kpis?.total_taches || 0;
+    const totalDonut = tachesDonutData.reduce((acc, curr) => acc + curr.value, 0);
 
     // CustomAvancementGauge déplacé plus haut
 
@@ -478,7 +478,7 @@ const Dashboard = () => {
                                         )}
                                         <div className="flex items-center justify-between text-[10px] font-medium mt-2">
                                             <span className="flex items-center gap-1.5 px-2 py-1 bg-white rounded-md text-gray-600 border border-gray-100 shadow-sm"><User size={10} className="text-gray-400"/> {tache.responsable?.prenom} {tache.responsable?.nom}</span>
-                                            <span className="flex items-center gap-1.5 px-2 py-1 bg-red-50 rounded-md text-red-600"><Clock size={10}/> {tache.date_limite}</span>
+                                            <span className="flex items-center gap-1.5 px-2 py-1 bg-red-50 rounded-md text-red-600"><Clock size={10}/> {new Date(tache.date_limite).toLocaleDateString('fr-FR', {day: 'numeric', month: 'short', year: 'numeric'})}</span>
                                         </div>
                                     </div>
                                 </div>
