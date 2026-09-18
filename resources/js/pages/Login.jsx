@@ -163,11 +163,7 @@ const Login = () => {
                         ) : (
                             <div className="p-8">
                                 <div className="text-center mb-8 flex flex-col items-center">
-                                    <span className="inline-flex items-center gap-2 bg-[#0564A8]/10 text-[#0564A8] px-3 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase mb-6 select-none border border-[#0564A8]/20">
-                                        <Lock size={12} className="text-[#0564A8]" />
-                                        Accès Restreint
-                                    </span>
-                                    <h1 className="text-2xl font-extrabold text-gray-900 mb-2">Bienvenue</h1>
+                                    <h1 className="text-2xl font-extrabold text-gray-900 mb-2 mt-4">Bienvenue</h1>
                                     <p className="text-gray-500 text-sm">Connectez-vous à votre espace de travail</p>
                                 </div>
 
