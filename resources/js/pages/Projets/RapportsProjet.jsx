@@ -48,6 +48,23 @@ const RapportsProjet = ({ projetId, currentUser }) => {
         fetchData();
     }, [projetId]);
 
+    useEffect(() => {
+        const hash = window.location.hash;
+        if (hash && hash.startsWith('#rapport-')) {
+            const rId = parseInt(hash.replace('#rapport-', ''));
+            if (!isNaN(rId) && rapports.some(r => r.id === rId)) {
+                if (expandedRapport !== rId) {
+                    setExpandedRapport(rId);
+                    loadCommentaires(rId);
+                    setTimeout(() => {
+                        const el = document.getElementById('rapport-' + rId);
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 300);
+                }
+            }
+        }
+    }, [window.location.hash, rapports]);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSubmitting(true);
@@ -155,7 +172,7 @@ const RapportsProjet = ({ projetId, currentUser }) => {
                 ) : (
                     <div className="grid grid-cols-1 gap-6">
                         {rapports.map(rapport => (
-                            <div key={rapport.id} className={`bg-white border transition-all shadow-sm rounded-2xl overflow-hidden ${expandedRapport === rapport.id ? 'border-[#0564A8] ring-1 ring-[#0564A8]' : 'border-gray-200 hover:border-blue-300'}`}>
+                            <div id={`rapport-${rapport.id}`} key={rapport.id} className={`bg-white border transition-all shadow-sm rounded-2xl overflow-hidden ${expandedRapport === rapport.id ? 'border-[#0564A8] ring-1 ring-[#0564A8]' : 'border-gray-200 hover:border-blue-300'}`}>
                                 <div className="p-5">
                                     <div className="flex justify-between items-start mb-3">
                                         <div className="flex gap-2 items-center">

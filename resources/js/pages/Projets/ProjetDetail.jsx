@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import api from '../../axios';
 import { 
     FolderKanban, Users, Calendar, ArrowLeft, 
@@ -62,6 +62,7 @@ const ModalCreatePhase = ({ projetId, onClose, onSuccess }) => {
 
 const ProjetDetail = () => {
     const { id } = useParams();
+    const location = useLocation();
     const [projet, setProjet] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('kanban'); // 'kanban', 'equipe'
@@ -90,6 +91,15 @@ const ProjetDetail = () => {
         setCurrentUser(u);
         fetchProjet();
     }, [id]);
+
+    useEffect(() => {
+        if (location.hash && location.hash.startsWith('#rapport')) {
+            setActiveTab('rapports');
+            if (projet && projet.unread_rapports_count > 0) {
+                setProjet(p => ({ ...p, unread_rapports_count: 0 }));
+            }
+        }
+    }, [location.hash, projet?.id]);
 
     if (loading) return <div className="p-8 text-center text-gray-500 animate-pulse">Chargement du projet...</div>;
     if (!projet) return <div className="p-8 text-center text-red-500">Projet introuvable.</div>;
@@ -283,10 +293,21 @@ const ProjetDetail = () => {
                     <GitPullRequest size={16} /> Demandes de Changement
                 </button>
                 <button 
-                    onClick={() => setActiveTab('rapports')}
+                    onClick={() => {
+                        setActiveTab('rapports');
+                        if (projet.unread_rapports_count > 0) {
+                            setProjet({ ...projet, unread_rapports_count: 0 });
+                            // Optionnel: on pourrait appeler une API ici pour marquer comme lu en BDD
+                        }
+                    }}
                     className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${activeTab === 'rapports' ? 'border-[#0564A8] text-[#0564A8]' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
                 >
                     <FileText size={16} /> Rapports
+                    {projet.unread_rapports_count > 0 && (
+                        <span className="ml-1 flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-black shadow-sm">
+                            {projet.unread_rapports_count}
+                        </span>
+                    )}
                 </button>
             </div>
 

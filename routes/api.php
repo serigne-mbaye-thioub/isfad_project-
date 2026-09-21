@@ -139,6 +139,9 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     // Rapports
     Route::get('/projets/{projetId}/rapports', [\App\Http\Controllers\RapportController::class, 'index']);
     Route::post('/projets/{projetId}/rapports', [\App\Http\Controllers\RapportController::class, 'store']);
+    Route::get('/rapports/{id}', function ($id) {
+        return \App\Models\Rapport::findOrFail($id);
+    });
     Route::get('/rapports/{id}/commentaires', [\App\Http\Controllers\RapportCommentaireController::class, 'index']);
     Route::post('/rapports/{id}/commentaires', [\App\Http\Controllers\RapportCommentaireController::class, 'store']);
     Route::post('/budgets/{id}/depenses', [\App\Http\Controllers\DepenseController::class, 'store']);

@@ -21,9 +21,8 @@ class DashboardController extends Controller
     {
         $user = $request->user();
 
-        // 1. Vue Administrateur (Configuration Système)
         if ($user->isAdminGlobally()) {
-            return $this->getAdminStats();
+            return $this->getAdminStats($user);
         }
 
         // 2. Vue Globale : Superviseur, Gestionnaire de projet (qui ont la vision sur tous les projets)
@@ -45,7 +44,7 @@ class DashboardController extends Controller
         return $this->getMembreStats($user);
     }
 
-    private function getAdminStats(): JsonResponse
+    private function getAdminStats(Utilisateur $user): JsonResponse
     {
         $utilisateurs = [
             'total' => Utilisateur::count(),
@@ -62,7 +61,7 @@ class DashboardController extends Controller
             'role_vue' => 'Administrateur',
             'utilisateurs' => $utilisateurs,
             'activite_recente' => $activite_recente,
-            'sa_journee' => $this->getSaJournee(Auth::user())
+            'sa_journee' => $this->getSaJournee($user)
         ]);
     }
 

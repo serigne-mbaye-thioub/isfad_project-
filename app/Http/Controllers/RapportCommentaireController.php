@@ -53,13 +53,19 @@ class RapportCommentaireController extends Controller
         $destinatairesNotifier = array_unique($destinatairesNotifier);
 
         foreach ($destinatairesNotifier as $destId) {
-            Notification::create([
+            $notif = Notification::create([
                 'type_evenement' => 'nouveau_commentaire_rapport',
-                'id_cible' => $rapport->id,
-                'type_cible' => 'rapport',
-                'message' => $user->prenom . " " . $user->nom . " a commenté le rapport : " . $rapport->titre,
-                'id_destinataire' => $destId,
-                'id_declencheur' => $user->id,
+                'titre'          => 'Nouveau commentaire sur un rapport',
+                'contenu'        => $user->prenom . " " . $user->nom . " a commenté le rapport : \"" . $rapport->titre . "\".",
+                'type_cible'     => 'rapport',
+                'id_cible'       => $rapport->id,
+                'id_emetteur'    => $user->id,
+            ]);
+
+            \App\Models\NotificationDestinataire::create([
+                'id_notification' => $notif->id,
+                'id_utilisateur'  => $destId,
+                'est_lue'         => false,
             ]);
         }
 

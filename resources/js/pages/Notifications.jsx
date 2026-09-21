@@ -144,6 +144,15 @@ const Notifications = () => {
                                                 Voir le projet <ArrowRight size={14} />
                                             </Link>
                                         )}
+                                        {notif.type_cible === 'rapport' && notif.id_cible && (
+                                            <Link 
+                                                to={`/rapports/${notif.id_cible}`}
+                                                className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0564A8] hover:text-[#044c80] hover:underline"
+                                                onClick={() => !n.est_lue && markAsRead(n.id)}
+                                            >
+                                                Voir le rapport <ArrowRight size={14} />
+                                            </Link>
+                                        )}
                                         {notif.type_evenement === 'demande_changement' && (
                                             <Link 
                                                 to="/demandes"

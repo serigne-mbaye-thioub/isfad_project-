@@ -473,6 +473,17 @@ class ProjetController extends Controller
             }
         }
 
+        // Calculer le nombre de notifications non lues liées aux rapports de ce projet
+        $rapportIds = \App\Models\Rapport::where('type_cible', 'projet')->where('id_cible', $id)->pluck('id');
+        $unreadRapportsCount = \App\Models\NotificationDestinataire::where('id_utilisateur', $user->id)
+            ->where('est_lue', false)
+            ->whereHas('notification', function ($query) use ($rapportIds) {
+                $query->where('type_cible', 'rapport')
+                      ->whereIn('id_cible', $rapportIds);
+            })->count();
+        
+        $projet->unread_rapports_count = $unreadRapportsCount;
+
         return response()->json($projet);
     }
 

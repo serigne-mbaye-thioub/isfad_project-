@@ -121,13 +121,19 @@ class RapportController extends Controller
 
             // Notifications
             foreach ($destinatairesIds as $destId) {
-                \App\Models\Notification::create([
+                $notif = \App\Models\Notification::create([
                     'type_evenement' => 'nouveau_rapport',
-                    'id_cible' => $rapport->id,
-                    'type_cible' => 'rapport',
-                    'message' => $user->prenom . " " . $user->nom . " a partagé un nouveau rapport avec vous : " . $rapport->titre,
-                    'id_destinataire' => $destId,
-                    'id_declencheur' => $user->id,
+                    'titre'          => 'Nouveau rapport partagé',
+                    'contenu'        => $user->prenom . " " . $user->nom . " a partagé un rapport avec vous : \"" . $rapport->titre . "\".",
+                    'type_cible'     => 'rapport',
+                    'id_cible'       => $rapport->id,
+                    'id_emetteur'    => $user->id,
+                ]);
+
+                \App\Models\NotificationDestinataire::create([
+                    'id_notification' => $notif->id,
+                    'id_utilisateur'  => $destId,
+                    'est_lue'         => false,
                 ]);
             }
         }

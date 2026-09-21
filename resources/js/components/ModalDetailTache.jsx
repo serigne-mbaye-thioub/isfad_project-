@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Clock, AlertCircle, PlayCircle, CheckCircle2, Edit2 } from 'lucide-react';
 import api from '../axios';
+import { ModalCreateTache } from './FormsPlanification';
 
 const STATUS_MAP = {
     'a_faire': { label: 'À faire', color: 'bg-gray-100 text-gray-700' },
@@ -34,6 +35,7 @@ const UserBadge = ({ user, role, bgColor }) => {
 const ModalDetailTache = ({ task, onClose, currentUser, membres = [], onTaskUpdate }) => {
     const [loadingResponsable, setLoadingResponsable] = useState(false);
     const [isEditingResponsable, setIsEditingResponsable] = useState(false);
+    const [isEditingGlobal, setIsEditingGlobal] = useState(false);
 
     const [commentaires, setCommentaires] = useState([]);
     const [loadingCommentaires, setLoadingCommentaires] = useState(false);
@@ -42,8 +44,8 @@ const ModalDetailTache = ({ task, onClose, currentUser, membres = [], onTaskUpda
 
     React.useEffect(() => {
         if (!task) return;
-        const isResponsable = currentUser?.id === task.id_responsable;
-        const isApprobateur = currentUser?.id === task.id_approbateur;
+        const isResponsable = currentUser?.id == task.id_responsable;
+        const isApprobateur = currentUser?.id == task.id_approbateur;
         const canAccessComments = isResponsable || isApprobateur;
 
         if (canAccessComments) {
@@ -60,10 +62,11 @@ const ModalDetailTache = ({ task, onClose, currentUser, membres = [], onTaskUpda
     const consultes = task.racis?.filter(r => r.role_raci === 'consulte').map(r => r.utilisateur) || [];
     const informes = task.racis?.filter(r => r.role_raci === 'informe').map(r => r.utilisateur) || [];
 
-    const peutReaffecter = currentUser && ['Chef de projet', 'Gestionnaire de projet', 'Gestionnaire', 'Administrateur', 'Administrateur système'].includes(currentUser.fonction);
-    const isResponsable = currentUser?.id === task.id_responsable;
-    const isApprobateur = currentUser?.id === task.id_approbateur;
+    const peutReaffecter = currentUser && ['Chef de projet', 'Gestionnaire de projet', 'Gestionnaire', 'Administrateur', 'Administrateur système', 'Architecte', 'Architecte de projet'].includes(currentUser.fonction);
+    const isResponsable = currentUser?.id == task.id_responsable;
+    const isApprobateur = currentUser?.id == task.id_approbateur;
     const canAccessComments = isResponsable || isApprobateur;
+    const peutModifierGlobal = peutReaffecter || isResponsable;
 
     const handleReaffecter = async (newId) => {
         if (!newId) return;
@@ -118,9 +121,16 @@ const ModalDetailTache = ({ task, onClose, currentUser, membres = [], onTaskUpda
                         )}
                         <h2 className="text-xl font-black text-[#0564A8] leading-tight">{task.titre}</h2>
                     </div>
-                    <button onClick={onClose} className="p-2 text-gray-400 hover:bg-gray-100 rounded-full transition">
-                        <X size={20} />
-                    </button>
+                    <div className="flex gap-2">
+                        {peutModifierGlobal && (
+                            <button onClick={() => setIsEditingGlobal(true)} className="p-2 text-gray-400 hover:bg-blue-50 hover:text-[#0564A8] rounded-full transition" title="Modifier la tâche">
+                                <Edit2 size={20} />
+                            </button>
+                        )}
+                        <button onClick={onClose} className="p-2 text-gray-400 hover:bg-gray-100 rounded-full transition" title="Fermer">
+                            <X size={20} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Body */}
@@ -315,6 +325,15 @@ const ModalDetailTache = ({ task, onClose, currentUser, membres = [], onTaskUpda
                     )}
                 </div>
             </div>
+            {isEditingGlobal && (
+                <ModalCreateTache 
+                    initialData={task}
+                    projetId={task.id_projet}
+                    membres={membres}
+                    onClose={() => setIsEditingGlobal(false)}
+                    onSuccess={() => { setIsEditingGlobal(false); if (onTaskUpdate) onTaskUpdate(); }}
+                />
+            )}
         </div>
     );
 };

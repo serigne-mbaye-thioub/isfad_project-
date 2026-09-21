@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../axios';
-import { AlertTriangle, Plus } from 'lucide-react';
+import { AlertTriangle, Plus, Edit2 } from 'lucide-react';
 
 export const ModalCreateActivite = ({ phases, jalons = [], projetId, onClose, onSuccess }) => {
     const [formData, setFormData] = useState({ id_phase: '', id_jalon: '', titre: '', description: '', date_debut: '', date_fin: '', priorite: 'moyenne' });
@@ -55,17 +55,17 @@ export const ModalCreateActivite = ({ phases, jalons = [], projetId, onClose, on
     );
 };
 
-export const ModalCreateTache = ({ toutesActivites = [], projetId, membres = [], onClose, onSuccess }) => {
+export const ModalCreateTache = ({ toutesActivites = [], projetId, membres = [], onClose, onSuccess, initialData = null }) => {
     const [formData, setFormData] = useState({
-        id_activite: '',
-        titre: '',
-        description: '',
-        priorite: 'moyenne',
-        date_limite: '',
-        id_responsable: '',
-        id_approbateur: '',
-        consultes: [],
-        informes: [],
+        id_activite: initialData?.id_activite || '',
+        titre: initialData?.titre || '',
+        description: initialData?.description || '',
+        priorite: initialData?.priorite || 'moyenne',
+        date_limite: initialData?.date_limite ? initialData.date_limite.split(' ')[0] : '',
+        id_responsable: initialData?.id_responsable || '',
+        id_approbateur: initialData?.id_approbateur || '',
+        consultes: initialData?.racis?.filter(r => r.role_raci === 'consulte').map(r => r.id_utilisateur) || [],
+        informes: initialData?.racis?.filter(r => r.role_raci === 'informe').map(r => r.id_utilisateur) || [],
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -116,7 +116,11 @@ export const ModalCreateTache = ({ toutesActivites = [], projetId, membres = [],
                 payload.id_projet = projetId;
             }
 
-            await api.post(`/api/taches`, payload);
+            if (initialData) {
+                await api.put(`/api/taches/${initialData.id}`, payload);
+            } else {
+                await api.post(`/api/taches`, payload);
+            }
             onSuccess();
         } catch (e) {
             setError(e.response?.data?.message || 'Erreur lors de la création de la tâche');
@@ -129,7 +133,8 @@ export const ModalCreateTache = ({ toutesActivites = [], projetId, membres = [],
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 w-full max-w-3xl shadow-2xl max-h-[90vh] flex flex-col">
                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2 shrink-0">
-                    <Plus size={20} className="text-[#0564A8]" /> Nouvelle Tâche
+                    {initialData ? <Edit2 size={20} className="text-[#0564A8]" /> : <Plus size={20} className="text-[#0564A8]" />} 
+                    {initialData ? "Modifier la tâche" : "Nouvelle Tâche"}
                 </h3>
 
                 {error && (
@@ -292,8 +297,8 @@ export const ModalCreateTache = ({ toutesActivites = [], projetId, membres = [],
 
                 <div className="flex justify-end gap-2 pt-4 border-t border-gray-100 shrink-0">
                     <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-100 rounded-lg text-sm font-semibold hover:bg-gray-200 transition">Annuler</button>
-                    <button type="submit" disabled={loading} className="px-4 py-2 bg-[#0564A8] text-white rounded-lg text-sm font-bold hover:bg-[#044c80] transition">
-                        {loading ? 'Création...' : 'Créer la tâche'}
+                    <button type="submit" disabled={loading} className="px-6 py-2 bg-[#0564A8] text-white rounded-lg hover:bg-[#044c80] transition disabled:opacity-50 font-medium">
+                        {loading ? 'Enregistrement...' : (initialData ? 'Enregistrer les modifications' : 'Créer la tâche')}
                     </button>
                 </div>
             </form>

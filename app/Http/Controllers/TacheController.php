@@ -41,10 +41,15 @@ class TacheController extends Controller
     /**
      * Vérifie si un utilisateur a le droit de créer/modifier des tâches pour un projet/activité.
      */
-    private function peutGererTache($user, $id_projet, $id_activite = null)
+    private function peutGererTache($user, $id_projet, $id_activite = null, $id_tache = null)
     {
         if ($user->isAdminGlobally() || ($user->hasRole('Gestionnaire de projet') && $user->fonction !== 'Chef de projet' && $user->fonction !== 'Architecte de projet')) {
             return true; // Accès global
+        }
+
+        if ($id_tache) {
+            $tache = \App\Models\Tache::find($id_tache);
+            if ($tache && $tache->id_responsable === $user->id) return true;
         }
 
         if (!$id_projet && $id_activite) {
@@ -270,21 +275,39 @@ class TacheController extends Controller
     {
         $tache = Tache::findOrFail($id);
 
-        if (!$this->peutGererTache($request->user(), $tache->id_projet, $tache->id_activite)) {
-            return response()->json(['message' => 'Accès non autorisé. Seul le Chef de projet, Gestionnaire, ou Responsable d\'activité peut modifier les informations de cette tâche.'], 403);
+        if (!$this->peutGererTache($request->user(), $tache->id_projet, $tache->id_activite, $tache->id)) {
+            return response()->json(['message' => 'Accès non autorisé. Seul le Responsable de la tâche, le Chef de projet ou le Gestionnaire peut modifier cette tâche.'], 403);
         }
 
         $validated = $request->validate([
             'titre' => 'string|max:200',
             'description' => 'nullable|string',
             'priorite' => 'in:basse,moyenne,haute,critique',
-            'date_debut' => 'date',
+            'date_debut' => 'nullable|date',
             'date_limite' => 'date|after_or_equal:date_debut',
             'id_responsable' => 'exists:utilisateurs,id',
             'id_approbateur' => 'nullable|exists:utilisateurs,id',
+            'consultes'      => 'nullable|array',
+            'consultes.*'    => 'exists:utilisateurs,id',
+            'informes'       => 'nullable|array',
+            'informes.*'     => 'exists:utilisateurs,id',
         ]);
 
-        $tache->update($validated);
+        $tache->update($request->only(['titre', 'description', 'priorite', 'date_debut', 'date_limite', 'id_responsable', 'id_approbateur']));
+
+        if ($request->has('consultes') || $request->has('informes')) {
+            \App\Models\TacheRaci::where('id_tache', $tache->id)->whereIn('role_raci', ['consulte', 'informe'])->delete();
+            if (!empty($validated['consultes'])) {
+                foreach ($validated['consultes'] as $c) {
+                    \App\Models\TacheRaci::create(['id_tache' => $tache->id, 'id_utilisateur' => $c, 'role_raci' => 'consulte']);
+                }
+            }
+            if (!empty($validated['informes'])) {
+                foreach ($validated['informes'] as $i) {
+                    \App\Models\TacheRaci::create(['id_tache' => $tache->id, 'id_utilisateur' => $i, 'role_raci' => 'informe']);
+                }
+            }
+        }
 
         $this->ensureUsersInProject($tache);
 

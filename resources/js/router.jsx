@@ -18,6 +18,7 @@ import Profil from './pages/Profil';
 import Parametres from './pages/Parametres';
 import Personnalisation from './pages/Personnalisation';
 import Aide from './pages/Aide';
+import RapportRedirector from './pages/RapportRedirector';
 
 // Bug fix #3 : plus de chevauchement de routes sur '/'.
 // Bug fix #8 : ProtectedRoute enveloppe les pages sécurisées.
@@ -57,6 +58,10 @@ const router = createBrowserRouter([
             {
                 path: 'projets/:id',
                 element: <ProjetDetail />,
+            },
+            {
+                path: 'rapports/:id',
+                element: <RapportRedirector />,
             },
             {
                 path: 'mes-taches',
