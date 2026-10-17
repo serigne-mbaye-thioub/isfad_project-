@@ -98,14 +98,3 @@ Suivez ces étapes pour configurer le projet localement :
   - `router.jsx` : Configuration des routes frontend.
 - `/database` : Migrations et Seeders de la base de données.
 
-## 🤝 Contribution
-
-1. Forkez le projet.
-2. Créez votre branche de fonctionnalité (`git checkout -b feature/AmazingFeature`).
-3. Commitez vos changements (`git commit -m 'Add some AmazingFeature'`).
-4. Poussez vers la branche (`git push origin feature/AmazingFeature`).
-5. Ouvrez une Pull Request.
-
-## 📄 Licence
-
-Ce projet est sous licence MIT.
